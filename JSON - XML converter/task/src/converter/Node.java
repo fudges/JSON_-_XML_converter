@@ -3,59 +3,54 @@ package converter;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 
-public class Node
-{
-    public String path;
-    public String elementKey;
-    public String elementValue;
-    public LinkedHashMap<String, String> attributesOrKeyValuePairs;
-    public ArrayList<Node> children;
+public class Node {
+    public String path = "";
+    public String element = "";
+    public String elementValue = "";
+    public LinkedHashMap<String, String> attributes = new LinkedHashMap<>();
+    public ArrayList<Node> children = new ArrayList<>();
 
     public ArrayList<Node> getChildren() {
-        return this.children;
+        return children;
     }
 
-    public LinkedHashMap<String, String> getAttributesOrKeyValuePairs() {
-        return this.attributesOrKeyValuePairs;
+    public LinkedHashMap<String, String> getAttributes() {
+        return attributes;
     }
 
     public String getPath() {
-        return this.path;
+        return path;
     }
 
-    public void setPath(final String path) {
+    public void setPath(String path) {
         this.path = path;
     }
 
-    public String getElementKey() {
-        return this.elementKey;
+    public String getElement() {
+        return element;
     }
 
-    public void setElementKey(final String elementKey) {
-        this.elementKey = elementKey;
+    public void setElement(String element) {
+        this.element = element;
     }
 
     public String getElementValue() {
-        return this.elementValue;
+        return elementValue;
     }
 
-    public void setElementValue(final String elementValue) {
+    public void setElementValue(String elementValue) {
         this.elementValue = elementValue;
     }
 
     public Node() {
-        this.path = "";
-        this.elementKey = "";
-        this.elementValue = "";
-        this.attributesOrKeyValuePairs = new LinkedHashMap<String, String>();
-        this.children = new ArrayList<Node>();
+
     }
 
-    public void addAddtribute(final String key, final String value) {
-        this.attributesOrKeyValuePairs.put(key, value);
+    public void addAddtribute(String key, String value){
+        this.attributes.put(key, value);
     }
 
-    public void addChild(final Node node) {
+    public void addChild(Node node){
         this.children.add(node);
     }
 }

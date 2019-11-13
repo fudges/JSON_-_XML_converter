@@ -32,7 +32,7 @@ public class Main {
 
 
         File file = new File("C:\\Users\\Michael\\Desktop\\JavaProjects\\JSON - XML converter\\JSON - XML converter\\task\\src" +
-                "\\test5.txt");
+                "\\test7.txt");
         String input = "";
         try {
             try (Scanner scanner = new Scanner(file);){
@@ -64,14 +64,29 @@ public class Main {
         } else {
             //Could not detect, handle error. EXCEPTION??
         }*/
-        intermediaryFormat = convertToIntermediaryFormat(parseJson(input), 0, "");
+
+        //Check for "root" brackets
+        String startingPath = "";
+        Pattern rootDetectingPattern = Pattern.compile("^\\s*\\{.*}\\s*$");
+        Matcher rootDetectingMatcher = rootDetectingPattern.matcher(input);
+        if (rootDetectingMatcher.find()){
+            startingPath = "root";
+        }
+        intermediaryFormat = convertToIntermediaryFormat(parseJson(input), 0, startingPath);
         //print intermediaryFormat as xml
         //Loop through string, grab all info, store in Elements
 
-        printAsXML(convertToIntermediaryFormat(parseJson(input), 0, ""));
 
-        System.out.println(convertToIntermediaryFormat(parseJson(input), 0, ""));
+        String out = printAsXML(convertToIntermediaryFormat(parseJson(input), 0, startingPath));
+        System.out.println(out);
+
+        //System.out.println(convertToIntermediaryFormat(parseJson(input), 0, ""));
     }
+
+
+
+
+
 
     public static String printAsXML(String input){
         //input must be in intermediaryFormat(String)
@@ -83,12 +98,13 @@ public class Main {
         String inputNew = input.replaceAll("(?m)^[ \t]*\r?\n", "");
         System.out.println(inputNew);
 
+        input = input.replaceAll("\n\n","\n");
         String[] lines = input.split("\n");
 
         //Patterns
         Pattern elementPattern = Pattern.compile("Element:");
         Pattern pathPattern = Pattern.compile("path = (.*)");
-        Pattern valuePattern = Pattern.compile("value = \"?(.*)\"?");
+        Pattern valuePattern = Pattern.compile("value = \"?([^\"]*)\"?");
         Pattern attributesPattern = Pattern.compile("attributes:");
         Pattern attributeParsePattern = Pattern.compile("([^\\s]*)\\s=\\s(.*)");
 
@@ -97,9 +113,12 @@ public class Main {
         boolean valueFound = false;
         boolean attributesFound = false;
         boolean isChildElement = false;
+        boolean finishElement = false;
+        boolean closeParentTag = false;
 
         //Counters
         int indentLevel = 0;
+        int index = 0;
 
         //Recurring variables
         String prevPath = "";
@@ -109,17 +128,15 @@ public class Main {
         String curValue = "";
         String attribKey = "";
         String attribValue = "";
+        String curParentPath = "path = ";
+        String prevFullPath = "";
+        String curFullPath = "";
+        Path latestPath;
 
         //Lists
         ArrayList<String> parentTags = new ArrayList<>();
+        ArrayList<Path> pathList = new ArrayList<>();
 
-
-
-        //TODO:
-        //Need to close tag when it's done.
-        //need to store parent tag
-        //need to properly indent and do new line
-        //need to set up output of value
 
         for (String line :
                 lines) {
@@ -130,52 +147,47 @@ public class Main {
             Matcher lineAttributesParse = attributeParsePattern.matcher(line);
 
             boolean pause = true;
-            if(lineElement.find() && prevPath.equalsIgnoreCase("")){
+            boolean elementHeaderFound = false;
+            if(lineElement.find()){
+                    elementHeaderFound = true;
+            }
+            if(elementHeaderFound && prevPath.equalsIgnoreCase("")){
                 //first element
                 //Nothing really needs done here
             }
 
-
-            if (lineElement.find() && !prevPath.equalsIgnoreCase("")){
+            //When you know that element is done
+            //NEED TO SET UP STUFF FOR WHEN YOURE AT THE LAST ELEMENT
+            // || index == lines.length-1
+            if (elementHeaderFound && !prevPath.equalsIgnoreCase("") ){
                 //Wrap stuff up here from previous element
-
-                //if it isChildElement, indentLevel++
-                if (isChildElement){
-                    parentTags.add("");
-                    indentLevel++;
-                }
-                //If there's a value, print it here
-                if (curValue.equalsIgnoreCase("")){
-                    if (!curValue.equalsIgnoreCase("null")){
-                        output += ">" + curValue + "</ " + curElementName + ">";
-                    } else {
-                        output += "/>";
-                    }
-                }
-
-
-                //END OF LINE
-                isChildElement = false;
-                output += "\n";
+                finishElement = true;
+                attributesFound = false;
             }
 
             //Path is where you find out if it's child or not
             if (linePath.find()){
-                //Parse path here
+                //Parse path here, compare to previous path
+                curFullPath = line;
 
                 //Handle first element
                 if (prevPath.equalsIgnoreCase("")) {
+                    prevFullPath = line;
+
                     prevPath = linePath.group(1);
                     curPath = linePath.group(1);
                     String[] pathArray = curPath.replaceAll("\\s","").split(",");
-                    output += "<" + pathArray[0] + " ";
+                    curElementName = pathArray[pathArray.length-1];
+                    output += "<" + curElementName;
 
                     //Save elementName to prevElementName for future comparisons
                     prevElementName = pathArray[pathArray.length-1];
 
 
                     //No closing bracket yet, check for attributes
-                } else {
+                } else if (finishElement){
+                    finishElement = false;
+
                     //Subsequent elements
                     curPath = linePath.group(1);
                     String[] pathArray = curPath.replaceAll("\\s","").split(",");
@@ -187,15 +199,78 @@ public class Main {
                     if (childMatcher.find()){
                         isChildElement = true;
                     }
+
+                    //if it isChildElement, indentLevel++
+                    if (isChildElement){
+                        Path tempPath = new Path();
+                        tempPath.setPrevElementName(prevElementName);
+                        tempPath.setPathToElement(prevFullPath);
+                        pathList.add(tempPath);
+//                        parentTags.add(prevElementName);
+//                        curParentPath = curPath;
+                        indentLevel++;
+                    }
+
+                    //If there's a value, print it with closing tag
+//                    if (!curValue.equalsIgnoreCase("")){
+
+                        if (!curValue.equalsIgnoreCase("null") && !isChildElement){
+                            output += ">" + curValue + "</" + prevElementName + ">";
+                        } else if (curValue.equalsIgnoreCase("null") && !isChildElement){
+                            output += " />";
+                        } else {
+                            output += ">";
+                        }
+//                    }
+
+
+
+
                     //Check if parentTag needs closing
                     //WHEN SHOULD WE DO THIS?? Maybe set a boolean that is checked at new line
                     //If at this point it needs to be closed off, it would have to be done here.
 
+
+                    //Close parentTags here
+                    if (pathList.size() > 0) {
+                        for (int i = pathList.size() - 1; i >= 0; i--) {
+                            latestPath = pathList.get(i);
+                            Pattern latestPathPattern = Pattern.compile(latestPath.getPathToElement());
+                            Matcher latestPathMatcher = latestPathPattern.matcher(curFullPath);
+
+                            if (latestPathMatcher.find()) {
+                                break;
+                            } else {
+                                indentLevel--;
+                                String lastParentTag = latestPath.getPrevElementName();
+                                output += "\n" + getIndents(indentLevel) + "</" + lastParentTag + ">";
+                                pathList.remove(i);
+                            }
+                        }
+                    }
+                    //End of previous element here
+                    output += "\n";
+
+
+
+
+
+
+
+                    //Add tabs depending on indent
+                    output += getIndents(indentLevel);
+
+                    //END OF LINE
+                    isChildElement = false;
+
+
+
                     //replace 0 with indentLevel
-                    output += "<" + pathArray[pathArray.length-1] + " ";
+                    output += "<" + curElementName;
 
                     //Save elementName to prevElementName for future comparisons
-                    prevElementName = pathArray[pathArray.length-1];
+                    prevElementName = curElementName;
+                    prevFullPath = curFullPath;
                 }
 
 
@@ -214,13 +289,41 @@ public class Main {
                 if (lineAttributesParse.find()){
                     attribKey = lineAttributesParse.group(1);
                     attribValue = lineAttributesParse.group(2);
-                    output += attribKey + "=" + attribValue + " ";
+                    output += " " + attribKey + "=" + attribValue;
                 }
+            }
+            if (line.equalsIgnoreCase("Element:stop")){
+                //If there's a value, print it with closing tag
+//                if (!curValue.equalsIgnoreCase("")){
+                    if (!curValue.equalsIgnoreCase("null")){
+                        output += ">" + curValue + "</" + prevElementName + ">";
+                    } else if (curValue.equalsIgnoreCase("null")){//(!isChildElement){
+                        output += " />";
+                    } else {
+                        output += ">";
+                    }
+//                }
+            }
+            index++;
+        }
+
+
+
+        //Append closing tags, if they're still there
+        if (pathList.size() > 0) {
+            for (int i = pathList.size() - 1; i >= 0; i--) {
+                latestPath = pathList.get(i);
+
+                indentLevel--;
+                String lastParentTag = latestPath.getPrevElementName();
+                output += "\n" + getIndents(indentLevel) + "</" + lastParentTag + ">";
+                pathList.remove(i);
             }
         }
 
         return output;
     }
+
 
     public static String parseIntermediaryFormat(KeyValuePair input){
 
@@ -250,7 +353,31 @@ public class Main {
     }
 
     public static KeyValuePair parseJson(String input) {
-        return parseJsonBrackets(input);
+        //Test for root brackets
+        //HEY!! Does this go here or somewhere else?
+        //Test for root brackets
+        /*
+        TODO:
+        -turn this part back on
+        -figure out why it aint working
+        -It isn't properly adding in the root
+        */
+        Pattern rootPattern = Pattern.compile("^\\{.*}$");
+        Matcher rootMatcher = rootPattern.matcher(input);
+        if (rootMatcher.find()){
+            KeyValuePair rootPair = new KeyValuePair();
+
+            rootPair.setKey("root");
+            for (KeyValuePair keyValuePair :
+                    parseJsonBrackets(input).getValueArray()) {
+                rootPair.addToValueArray(keyValuePair);
+            }
+//            rootPair.addToValueArray(parseJsonBrackets(input));
+            return rootPair;
+        } else {
+            return parseJsonBrackets(input);
+        }
+
     }
 
     public static String detectJsonKeyValuePairs(String input) {
@@ -384,6 +511,8 @@ public class Main {
 
     public static KeyValuePair parseJsonBrackets(String input) {
         KeyValuePair keyValuePair = new KeyValuePair();
+
+        //Parse root brackets here?
         String keyValue = "";
         String inputDebug = input;
         Pattern emptyBracketsPattern = Pattern.compile("^\\{\\s*}$");
@@ -434,7 +563,7 @@ public class Main {
         String output = "";
         Pattern attribPattern = Pattern.compile("^@.*");
         Pattern elementValuePattern = Pattern.compile("^#.*");
-        if (depth != 0) {
+//        if (depth != 0) {
             if (depth > 0) {
                 output += "\n";
             }
@@ -458,7 +587,7 @@ public class Main {
                 i.remove();
                 break;
             }
-        }
+//        }
         boolean attribHeaderPrinted = false;
         if (input.getValueArray().size() > 0) {
             for (KeyValuePair keyValuePair : input.getValueArray()) {
@@ -509,6 +638,11 @@ public class Main {
         if (depth != 0) {
             boolean temp = true;
         }
+        //add Element: to end to help printAsXML wrap things up after last element
+        if (depth == 0){
+            output += "Element:stop\n";
+        }
+
         return output;
     }
 
