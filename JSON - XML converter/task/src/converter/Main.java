@@ -4,7 +4,6 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.util.ArrayList;
 import java.util.Iterator;
-import java.util.Map;
 import java.util.Scanner;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -72,7 +71,7 @@ public class Main {
         if (rootDetectingMatcher.find()){
             startingPath = "root";
         }
-        intermediaryFormat = convertToIntermediaryFormat(parseJson(input), 0, startingPath);
+//        intermediaryFormat = convertToIntermediaryFormat(parseJson(input), 0, startingPath);
         //print intermediaryFormat as xml
         //Loop through string, grab all info, store in Elements
 
@@ -359,7 +358,7 @@ public class Main {
         /*
         TODO:
         -turn this part back on
-        -figure out why it aint working
+        -figure out why it ain't working
         -It isn't properly adding in the root
         */
         Pattern rootPattern = Pattern.compile("^\\{.*}$");
@@ -372,7 +371,6 @@ public class Main {
                     parseJsonBrackets(input).getValueArray()) {
                 rootPair.addToValueArray(keyValuePair);
             }
-//            rootPair.addToValueArray(parseJsonBrackets(input));
             return rootPair;
         } else {
             return parseJsonBrackets(input);
@@ -627,7 +625,13 @@ public class Main {
                     continue;
                 }
                 if (depth == 0) {
-                     output += convertToIntermediaryFormat(keyValuePair, (depth + 1), keyValuePair.getKey());
+                    for (KeyValuePair valueArrayKeyValuePair : input.getValueArray()) {
+                        path = path + ", " + valueArrayKeyValuePair.getKey();
+                        String tempPath = path;
+                        output += convertToIntermediaryFormat(valueArrayKeyValuePair, (depth + 1), tempPath);
+                        path = (path).replaceFirst(", " + valueArrayKeyValuePair.getKey(), "");
+                    }
+//                     output += convertToIntermediaryFormat(keyValuePair, (depth + 1), tempPath);
                     continue;
                 }
                 path = path + ", " + keyValuePair.getKey();
@@ -646,31 +650,31 @@ public class Main {
         return output;
     }
 
-    public static void printNodes(Node node, int depth, String path) {
-        path = (path).equalsIgnoreCase("") ? node.elementKey : path + ", " + node.elementKey;
-        System.out.println("Element:");
-        System.out.println("path = " + path);
-        if (node.getChildren().size() == 0) {
-            if (node.getElementValue().equalsIgnoreCase("null")) {
-                System.out.println("elementValue = null");
-            } else {
-                System.out.println("elementValue = \"" + node.getElementValue() + "\"");
-            }
-        }
-        if (node.getAttributesOrKeyValuePairs().size() > 0) {
-            System.out.println("attributesOrKeyValuePairs:");
-            for (Map.Entry attribute : node.getAttributesOrKeyValuePairs().entrySet()) {
-                System.out.println(attribute.getKey() + " = \"" + attribute.getValue() + "\"");
-            }
-        }
-        ++depth;
-        System.out.println();
-        if (node.getChildren().size() > 0) {
-            for (Node child : node.getChildren()) {
-                printNodes((Node)child, depth, path);
-            }
-        }
-    }
+//    public static void printNodes(Node node, int depth, String path) {
+//        path = (path).equalsIgnoreCase("") ? node.elementKey : path + ", " + node.elementKey;
+//        System.out.println("Element:");
+//        System.out.println("path = " + path);
+//        if (node.getChildren().size() == 0) {
+//            if (node.getElementValue().equalsIgnoreCase("null")) {
+//                System.out.println("elementValue = null");
+//            } else {
+//                System.out.println("elementValue = \"" + node.getElementValue() + "\"");
+//            }
+//        }
+//        if (node.getAttributesOrKeyValuePairs().size() > 0) {
+//            System.out.println("attributesOrKeyValuePairs:");
+//            for (Map.Entry attribute : node.getAttributesOrKeyValuePairs().entrySet()) {
+//                System.out.println(attribute.getKey() + " = \"" + attribute.getValue() + "\"");
+//            }
+//        }
+//        ++depth;
+//        System.out.println();
+//        if (node.getChildren().size() > 0) {
+//            for (Node child : node.getChildren()) {
+//                printNodes((Node)child, depth, path);
+//            }
+//        }
+//    }
 
     public static Node processJsonNode(String input) {
         Node jsonNode = new Node();
@@ -678,84 +682,84 @@ public class Main {
         return node;
     }
 
-    public static Node processXmlNode(String input) {
-        String output = "";
-        Node xmlNode = new Node();
-        Pattern pTag = Pattern.compile("(<([^/]*?)/?>)");
-        Matcher mTag = pTag.matcher(input);
-        String elementValue = "";
-        boolean loneTag = false;
-        if (mTag.find()) {
-            Matcher elementValueMatcher;
-            Pattern elementValuePattern;
-            String fullTag = mTag.group(2);
-            String totalTag = mTag.group(1);
-            String element = fullTag.split(" ")[0];
-            output = output + "{ \"" + element + "\" : ";
-            Pattern pLoneTag = Pattern.compile("<.+?/>");
-            Matcher mLoneTag = pLoneTag.matcher(totalTag);
-            if (mLoneTag.find()) {
-                loneTag = true;
-                elementValue = "null";
-            }
-            if (!loneTag && (elementValueMatcher = (elementValuePattern = Pattern.compile(element + "[^>]*>\\s*(.*?)\\s*<")).matcher(input)).find()) {
-                elementValue = elementValueMatcher.group(1);
-            }
-            xmlNode.setElementKey(element);
-            xmlNode.setElementValue(elementValue);
-            String attributeCheck = fullTag.replaceFirst(element + "\\s*", "").stripTrailing();
-            if (attributeCheck.length() > 0) {
-                output = output + "{ ";
-                Pattern pattern = Pattern.compile("(\\w+).*?\"(\\w+)\"");
-                Matcher matcher = pattern.matcher(attributeCheck);
-                int lastFindPos = 0;
-                while (matcher.find()) {
-                    String attributeKey = matcher.group(1);
-                    String attributeValue = matcher.group(2);
-                    xmlNode.addAddtribute(attributeKey, attributeValue);
-                    output = output + "\"@" + matcher.group(1) + "\" : \"" + matcher.group(2) + "\"";
-                    lastFindPos = matcher.end();
-                    if (lastFindPos == attributeCheck.length() && elementValue == "" && !loneTag) continue;
-                    output = output + ", ";
-                }
-                if (elementValue != "" && !loneTag) {
-                    output = output + "\"#" + element + "\" : \"" + elementValue + "\"";
-                } else if (loneTag) {
-                    output = output + "\"#" + element + "\" : " + elementValue;
-                }
-                output = output + "} ";
-                output = output + "} ";
-            }
-            if (!loneTag) {
-                String recursiveInput = input;
-                String tempRegex = "</?" + element + ".*?>(?:(?!<).)*";
-                recursiveInput = recursiveInput.replaceAll(tempRegex, "");
-                while (recursiveInput.length() > 0) {
-                    Matcher newLoneTagCheckMatcher;
-                    Pattern newLoneTagCheckPattern;
-                    Pattern firstTagPattern = Pattern.compile("<(.*?)/?>");
-                    Matcher firstTagMatcher = firstTagPattern.matcher(recursiveInput);
-                    String firstTag = "";
-                    if (firstTagMatcher.find()) {
-                        firstTag = firstTagMatcher.group(1).split(" ")[0];
-                    }
-                    loneTag = (newLoneTagCheckMatcher = (newLoneTagCheckPattern = Pattern.compile(" ?^<" + firstTag + "[^>]*/>")).matcher(recursiveInput)).find();
-                    String getNextChildRegex = "";
-                    getNextChildRegex = !loneTag ? getNextChildRegex + "<" + firstTag + ".*?</" + firstTag + ">" : getNextChildRegex + "<" + firstTag + ".*?/>";
-                    Pattern childPattern = Pattern.compile(getNextChildRegex);
-                    Matcher childMatcher = childPattern.matcher(recursiveInput);
-                    if (!childMatcher.find()) continue;
-                    String newInput = childMatcher.group();
-                    xmlNode.addChild(processXmlNode(newInput));
-                    recursiveInput = recursiveInput.replaceAll(newInput + "\\s*", "");
-                }
-            } else {
-                return xmlNode;
-            }
-            return xmlNode;
-        }
-        System.out.println("ERROR: No tag found");
-        System.exit(1);
-        return xmlNode;
-    }
+//    public static Node processXmlNode(String input) {
+//        String output = "";
+//        Node xmlNode = new Node();
+//        Pattern pTag = Pattern.compile("(<([^/]*?)/?>)");
+//        Matcher mTag = pTag.matcher(input);
+//        String elementValue = "";
+//        boolean loneTag = false;
+//        if (mTag.find()) {
+//            Matcher elementValueMatcher;
+//            Pattern elementValuePattern;
+//            String fullTag = mTag.group(2);
+//            String totalTag = mTag.group(1);
+//            String element = fullTag.split(" ")[0];
+//            output = output + "{ \"" + element + "\" : ";
+//            Pattern pLoneTag = Pattern.compile("<.+?/>");
+//            Matcher mLoneTag = pLoneTag.matcher(totalTag);
+//            if (mLoneTag.find()) {
+//                loneTag = true;
+//                elementValue = "null";
+//            }
+//            if (!loneTag && (elementValueMatcher = (elementValuePattern = Pattern.compile(element + "[^>]*>\\s*(.*?)\\s*<")).matcher(input)).find()) {
+//                elementValue = elementValueMatcher.group(1);
+//            }
+//            xmlNode.setElementKey(element);
+//            xmlNode.setElementValue(elementValue);
+//            String attributeCheck = fullTag.replaceFirst(element + "\\s*", "").stripTrailing();
+//            if (attributeCheck.length() > 0) {
+//                output = output + "{ ";
+//                Pattern pattern = Pattern.compile("(\\w+).*?\"(\\w+)\"");
+//                Matcher matcher = pattern.matcher(attributeCheck);
+//                int lastFindPos = 0;
+//                while (matcher.find()) {
+//                    String attributeKey = matcher.group(1);
+//                    String attributeValue = matcher.group(2);
+//                    xmlNode.addAddtribute(attributeKey, attributeValue);
+//                    output = output + "\"@" + matcher.group(1) + "\" : \"" + matcher.group(2) + "\"";
+//                    lastFindPos = matcher.end();
+//                    if (lastFindPos == attributeCheck.length() && elementValue == "" && !loneTag) continue;
+//                    output = output + ", ";
+//                }
+//                if (elementValue != "" && !loneTag) {
+//                    output = output + "\"#" + element + "\" : \"" + elementValue + "\"";
+//                } else if (loneTag) {
+//                    output = output + "\"#" + element + "\" : " + elementValue;
+//                }
+//                output = output + "} ";
+//                output = output + "} ";
+//            }
+//            if (!loneTag) {
+//                String recursiveInput = input;
+//                String tempRegex = "</?" + element + ".*?>(?:(?!<).)*";
+//                recursiveInput = recursiveInput.replaceAll(tempRegex, "");
+//                while (recursiveInput.length() > 0) {
+//                    Matcher newLoneTagCheckMatcher;
+//                    Pattern newLoneTagCheckPattern;
+//                    Pattern firstTagPattern = Pattern.compile("<(.*?)/?>");
+//                    Matcher firstTagMatcher = firstTagPattern.matcher(recursiveInput);
+//                    String firstTag = "";
+//                    if (firstTagMatcher.find()) {
+//                        firstTag = firstTagMatcher.group(1).split(" ")[0];
+//                    }
+//                    loneTag = (newLoneTagCheckMatcher = (newLoneTagCheckPattern = Pattern.compile(" ?^<" + firstTag + "[^>]*/>")).matcher(recursiveInput)).find();
+//                    String getNextChildRegex = "";
+//                    getNextChildRegex = !loneTag ? getNextChildRegex + "<" + firstTag + ".*?</" + firstTag + ">" : getNextChildRegex + "<" + firstTag + ".*?/>";
+//                    Pattern childPattern = Pattern.compile(getNextChildRegex);
+//                    Matcher childMatcher = childPattern.matcher(recursiveInput);
+//                    if (!childMatcher.find()) continue;
+//                    String newInput = childMatcher.group();
+//                    xmlNode.addChild(processXmlNode(newInput));
+//                    recursiveInput = recursiveInput.replaceAll(newInput + "\\s*", "");
+//                }
+//            } else {
+//                return xmlNode;
+//            }
+//            return xmlNode;
+//        }
+//        System.out.println("ERROR: No tag found");
+//        System.exit(1);
+//        return xmlNode;
+//    }
 }
