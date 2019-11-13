@@ -5,17 +5,17 @@ import java.util.LinkedHashMap;
 
 public class Node {
     public String path = "";
-    public String element = "";
+    public String elementKey = "";
     public String elementValue = "";
-    public LinkedHashMap<String, String> attributes = new LinkedHashMap<>();
+    public LinkedHashMap<String, String> attributesOrKeyValuePairs = new LinkedHashMap<>();
     public ArrayList<Node> children = new ArrayList<>();
 
     public ArrayList<Node> getChildren() {
         return children;
     }
 
-    public LinkedHashMap<String, String> getAttributes() {
-        return attributes;
+    public LinkedHashMap<String, String> getAttributesOrKeyValuePairs() {
+        return attributesOrKeyValuePairs;
     }
 
     public String getPath() {
@@ -26,12 +26,12 @@ public class Node {
         this.path = path;
     }
 
-    public String getElement() {
-        return element;
+    public String getElementKey() {
+        return elementKey;
     }
 
-    public void setElement(String element) {
-        this.element = element;
+    public void setElementKey(String elementKey) {
+        this.elementKey = elementKey;
     }
 
     public String getElementValue() {
@@ -47,7 +47,7 @@ public class Node {
     }
 
     public void addAddtribute(String key, String value){
-        this.attributes.put(key, value);
+        this.attributesOrKeyValuePairs.put(key, value);
     }
 
     public void addChild(Node node){
