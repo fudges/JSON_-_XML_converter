@@ -54,6 +54,8 @@ public class Main {
 //            intermediaryFormat = convertJSONToIntermediaryFormat(parseJson(input), 0, "");
             output = convertJSONToIntermediaryFormat(processXml(input),0,"");
             System.out.println(output);
+            output = printAsJSON(output);
+            System.out.println(output);
         } else if (format.equalsIgnoreCase("JSON")){
             //Convert JSON -> XML
             String startingPath = "";
@@ -71,7 +73,7 @@ public class Main {
         }
     }
 
-    public static String printAsJSON(String input, int prevIndentLevel){
+    public static String printAsJSON(String input){
 
         String output = "";
         //Convert into single line, remove all extra spaces tabs and whatnot
@@ -93,11 +95,12 @@ public class Main {
         boolean finishElement = false;
         boolean firstElementFound = false;
         boolean surroundingBracketsPrinted = false;
+        boolean closeBrackets = false;
 //        boolean closeParentTag = false;
 
         //Counters
         int bracketCounter = 0;
-        int indentLevel = 0 + prevIndentLevel;
+        int indentLevel = 0;
         int index = 0;
 
         //Recurring variables
@@ -132,14 +135,6 @@ public class Main {
 
 
 
-            //TODO:
-            //How to parse this and print it as XML?
-            //Plan it out ahead of time on paper
-            //Keep tally of how many closing brackets. use the getIndent() method
-            //When printing various things, use the #,@ and whatever
-            //How to handle ROOT??
-            //This part shouldn't be too bad. just keep at it!!
-
             //Print Surrounding brackets
             if (!surroundingBracketsPrinted){
                 surroundingBracketsPrinted = true;
@@ -158,10 +153,6 @@ public class Main {
                 //TODO:
                 //Ok, so you have it printing the key, then the value or additional values in brackets if needed
                 //You need have it handle the closing brackets
-                //I think this method needs to be recursive.
-                //Basically any time you are printing something that's in brackets thats not values or attrib,
-                //   pass it to the same method
-
                 //You should probably run this a couple times to test and see, though.
                 //Just so you know how it runs.
 
@@ -172,7 +163,7 @@ public class Main {
                     //Set up a test in linePath.find() that triggers a isSubsequentElement flag.
                     //Actually, you should be able to pull that off here.
                 } else if (tempAttributeArray.size() == 0){
-                    output += getIndents(indentLevel) + "{\n";
+                    output += "{\n";
                     //Increment indent level before printing attributes/values
                     indentLevel++;
                     bracketCounter++;
@@ -197,69 +188,110 @@ public class Main {
                     indentLevel--;
 
                     //Close up the brackets at the end, decrease counters
-                    output += getIndents(indentLevel) + "}";
-                    indentLevel--;
+                    //Add flag or counter for closing brackets for closing a brackets
+                    if (closeBrackets){
+                        output += getIndents(indentLevel) + "}";
+                        indentLevel--;
+                    }
+
 
                     //Now output value, if there is one.
                 }
                 //If element has
             }
 
+
+            //TODO:
+            //Need to figure out how to track the current level, so you can add commas or close out the brackets.
+            //How to track? Be mentally prepared next time.
+
             //Start processing things on "path = ..."
             if (linePath.find()){
-                if (prevFullPath.equalsIgnoreCase("")){
-                    curFullPath = line;
-                    curPath = linePath.group(1);
 
-                    //Get current elementName / key
-                    String[] pathArray = curPath.replaceAll("\\s","").split(",");
-                    curElementKey = pathArray[pathArray.length-1];
+//                curFullPath = line;
+                curPath = linePath.group(1);
+
+                //Get current elementName / key
+                String[] pathArray = curPath.replaceAll("\\s","").split(",");
+                curElementKey = pathArray[pathArray.length-1];
 
 
-                } else {
-
-                    curFullPath = line;
-                    curPath = linePath.group(1);
-
-                    //Get current elementName / key
-                    String[] pathArray = curPath.replaceAll("\\s","").split(",");
-                    curElementKey = pathArray[pathArray.length-1];
-                    //Save elementName to prevElementKey for future comparisons
-                    prevElementKey = curElementKey;
-
+                if (!prevPath.equalsIgnoreCase("")){
                     //Check if this element is a child of previous element
                     //if curpath still contains previous elementKey, this new elementKey is a child
                     Pattern childPattern = Pattern.compile(prevElementKey);
                     Matcher childMatcher = childPattern.matcher(curPath);
                     if (childMatcher.find()){
                         isChildElement = true;
+                        indentLevel++;
                     }
-
-
-                    //Save curPath as prevPath for comparison to next element.
-                    prevPath = curPath;
-                }
-                curFullPath = line;
-                curPath = linePath.group(1);
-
-                //Get current elementName / key
-                //CHANGE THEN NAME LATER
-                String[] pathArray = curPath.replaceAll("\\s","").split(",");
-                curElementKey = pathArray[pathArray.length-1];
-                //Save elementName to prevElementKey for future comparisons
-                prevElementKey = curElementKey;
-
-                //Check if this element is a child of previous element
-                //if curpath still contains previous elementKey, this new elementKey is a child
-                Pattern childPattern = Pattern.compile(prevElementKey);
-                Matcher childMatcher = childPattern.matcher(curPath);
-                if (childMatcher.find()){
-                    isChildElement = true;
                 }
 
 
                 //Save curPath as prevPath for comparison to next element.
                 prevPath = curPath;
+                //Save elementName to prevElementKey for future comparisons
+                prevElementKey = curElementKey;
+//
+//                if (prevFullPath.equalsIgnoreCase("")){
+//                    curFullPath = line;
+//                    curPath = linePath.group(1);
+//
+//                    //Get current elementName / key
+//                    String[] pathArray = curPath.replaceAll("\\s","").split(",");
+//                    curElementKey = pathArray[pathArray.length-1];
+//
+//                    prevFullPath = curFullPath;
+//
+//
+//                } else {
+//
+//                    curFullPath = line;
+//                    curPath = linePath.group(1);
+//
+//                    //Get current elementName / key
+//                    String[] pathArray = curPath.replaceAll("\\s","").split(",");
+//                    curElementKey = pathArray[pathArray.length-1];
+//                    //Save elementName to prevElementKey for future comparisons
+//                    prevElementKey = curElementKey;
+//
+//                    //Check if this element is a child of previous element
+//                    //if curpath still contains previous elementKey, this new elementKey is a child
+//                    Pattern childPattern = Pattern.compile(prevElementKey);
+//                    Matcher childMatcher = childPattern.matcher(curPath);
+//                    if (childMatcher.find()){
+//                        isChildElement = true;
+//                        indentLevel++;
+//
+//                    }
+//
+//
+//                    //Save curPath as prevPath for comparison to next element.
+//                    prevPath = curPath;
+
+
+
+//                }
+//                curFullPath = line;
+//                curPath = linePath.group(1);
+//
+//                //Get current elementName / key
+//                String[] pathArray = curPath.replaceAll("\\s","").split(",");
+//                curElementKey = pathArray[pathArray.length-1];
+//                //Save elementName to prevElementKey for future comparisons
+//                prevElementKey = curElementKey;
+//
+//                //Check if this element is a child of previous element
+//                //if curpath still contains previous elementKey, this new elementKey is a child
+//                Pattern childPattern = Pattern.compile(prevElementKey);
+//                Matcher childMatcher = childPattern.matcher(curPath);
+//                if (childMatcher.find()){
+//                    isChildElement = true;
+//                }
+
+
+//                //Save curPath as prevPath for comparison to next element.
+//                prevPath = curPath;
             }
 
             //TODO:
