@@ -97,6 +97,8 @@ public class Main {
         boolean surroundingBracketsPrinted = false;
         boolean closeBrackets = false;
 //        boolean closeParentTag = false;
+        boolean childElementEnd = false;
+        boolean childStartFound = false;
 
         //Counters
         int bracketCounter = 0;
@@ -107,7 +109,7 @@ public class Main {
         String prevPath = "";
         String curPath = "";
         String curElementKey = "";
-        String prevElementKey = "";
+        String prevParentKey = "";
         String curValue = "";
         String attribKey = "";
         String attribValue = "";
@@ -158,11 +160,15 @@ public class Main {
 
                 output += getIndents(indentLevel) + "\"" + curElementKey + "\"" + ": ";
                 if (!curValue.equalsIgnoreCase("") && tempAttributeArray.size() == 0){
+
                     output += curValue;
+                    if (isChildElement){
+                        output += ",\n";
+                    }
                     //HOW TO DEAL WITH COMMAS AND SUBSEQUENT ELEMENTS?
                     //Set up a test in linePath.find() that triggers a isSubsequentElement flag.
                     //Actually, you should be able to pull that off here.
-                } else if (tempAttributeArray.size() == 0){
+                } else if (tempAttributeArray.size() > 0){
                     output += "{\n";
                     //Increment indent level before printing attributes/values
                     indentLevel++;
@@ -177,7 +183,7 @@ public class Main {
                         output += getIndents(indentLevel) + "\"@" + tempAttribKey + "\" : " + tempAttribValue;
                         //Do I need quotations here? I honestly have no clue.
 
-                        if(tempCounter != tempAttributeArray.size()-1){
+                        if(tempCounter != tempAttributeArray.size()-1 || !curValue.equalsIgnoreCase("")){
                             output += ",";
                         }
 
@@ -185,14 +191,25 @@ public class Main {
                         output += "\n";
                         tempCounter++;
                     }
-                    indentLevel--;
+                    //Turn off attributesFound here so that it works right for the next element
+                    attributesFound = false;
+                    //Clear tempAttributeArray
+                    tempAttributeArray.clear();
+
+                    //Add value if it exists
+                    if (!curValue.equalsIgnoreCase("")){
+                        output += getIndents(indentLevel) + "\"#" + curElementKey + "\": " + curValue + "\n";
+                    }
+
+
 
                     //Close up the brackets at the end, decrease counters
                     //Add flag or counter for closing brackets for closing a brackets
-                    if (closeBrackets){
-                        output += getIndents(indentLevel) + "}";
+//                    if (closeBrackets){
                         indentLevel--;
-                    }
+                        output += getIndents(indentLevel) + "}";
+
+//                    }
 
 
                     //Now output value, if there is one.
@@ -202,8 +219,15 @@ public class Main {
 
 
             //TODO:
-            //Need to figure out how to track the current level, so you can add commas or close out the brackets.
-            //How to track? Be mentally prepared next time.
+            //Seems to be working fine.
+            //NEED TO LOOK AT:
+            //  nonattr2 isn't printing empty brackets
+            //  attr2 isn't printing the blank value (somewhat similar to the above maybe?)
+            //  email is all messed up. This may cause problems and is possibly the reason
+            //    why I thought I needed to do things recursively in the first place.
+            //    I THINK I may need to create an object to track child elements, because right
+            //    now it's just flags and I don't think it can be maintained properly once you have
+            //    children of children.
 
             //Start processing things on "path = ..."
             if (linePath.find()){
@@ -219,79 +243,43 @@ public class Main {
                 if (!prevPath.equalsIgnoreCase("")){
                     //Check if this element is a child of previous element
                     //if curpath still contains previous elementKey, this new elementKey is a child
-                    Pattern childPattern = Pattern.compile(prevElementKey);
+                    Pattern childPattern = Pattern.compile(prevParentKey + ", " + curElementKey);
                     Matcher childMatcher = childPattern.matcher(curPath);
-                    if (childMatcher.find()){
+                    boolean childMatcherFound = childMatcher.find();
+                    if (childMatcherFound && !childStartFound){
+                        //If it is a child and you haven't started printing child elements yet, mark the start here
                         isChildElement = true;
                         indentLevel++;
+                        childStartFound = true;
+                        output += "{\n";
+                    } else if (childMatcherFound && childStartFound){
+                        //If it's a child but you've already started printing child elements, mark isChildElement, but don't increase indent
+                        isChildElement = true;
+                        //If it doesn't have a comma on the end, add one here
+                        String tempString = output.replaceAll("\\n","").replaceAll("\\t","");
+//                        if (!tempString.matches("^.*,$")){
+                        if (!tempString.matches("^(.|\\n|\\t)*,\\n*$")){
+                            output += ",\n";
+                        }
+
+                    } else if (!childMatcherFound && childStartFound){
+                        //If it's not a child element, but you have previously been printing child elements
+                        //Need this so you can close up the brackets and start it as a new element
+                        childElementEnd = true;
+                        childStartFound = false;
+                        isChildElement = false;
+                    } else {
+                        isChildElement = false;
+                        prevParentKey = curElementKey;
                     }
+                } else {
+                    //Grab initial key and store it here
+                    prevParentKey = curElementKey;
                 }
 
 
                 //Save curPath as prevPath for comparison to next element.
                 prevPath = curPath;
-                //Save elementName to prevElementKey for future comparisons
-                prevElementKey = curElementKey;
-//
-//                if (prevFullPath.equalsIgnoreCase("")){
-//                    curFullPath = line;
-//                    curPath = linePath.group(1);
-//
-//                    //Get current elementName / key
-//                    String[] pathArray = curPath.replaceAll("\\s","").split(",");
-//                    curElementKey = pathArray[pathArray.length-1];
-//
-//                    prevFullPath = curFullPath;
-//
-//
-//                } else {
-//
-//                    curFullPath = line;
-//                    curPath = linePath.group(1);
-//
-//                    //Get current elementName / key
-//                    String[] pathArray = curPath.replaceAll("\\s","").split(",");
-//                    curElementKey = pathArray[pathArray.length-1];
-//                    //Save elementName to prevElementKey for future comparisons
-//                    prevElementKey = curElementKey;
-//
-//                    //Check if this element is a child of previous element
-//                    //if curpath still contains previous elementKey, this new elementKey is a child
-//                    Pattern childPattern = Pattern.compile(prevElementKey);
-//                    Matcher childMatcher = childPattern.matcher(curPath);
-//                    if (childMatcher.find()){
-//                        isChildElement = true;
-//                        indentLevel++;
-//
-//                    }
-//
-//
-//                    //Save curPath as prevPath for comparison to next element.
-//                    prevPath = curPath;
-
-
-
-//                }
-//                curFullPath = line;
-//                curPath = linePath.group(1);
-//
-//                //Get current elementName / key
-//                String[] pathArray = curPath.replaceAll("\\s","").split(",");
-//                curElementKey = pathArray[pathArray.length-1];
-//                //Save elementName to prevElementKey for future comparisons
-//                prevElementKey = curElementKey;
-//
-//                //Check if this element is a child of previous element
-//                //if curpath still contains previous elementKey, this new elementKey is a child
-//                Pattern childPattern = Pattern.compile(prevElementKey);
-//                Matcher childMatcher = childPattern.matcher(curPath);
-//                if (childMatcher.find()){
-//                    isChildElement = true;
-//                }
-
-
-//                //Save curPath as prevPath for comparison to next element.
-//                prevPath = curPath;
             }
 
             //TODO:
@@ -314,6 +302,8 @@ public class Main {
                     tempKeyValuePair.setKey(lineAttributesParse.group(1));
                     tempKeyValuePair.setValue(lineAttributesParse.group(2));
                     tempAttributeArray.add(tempKeyValuePair);
+                } else {
+//                    attributesFound = false;
                 }
             }
 
@@ -573,7 +563,7 @@ public class Main {
             }
         }
         if (node.getAttributesOrKeyValuePairs().size() > 0) {
-            output += "attribute:\n";
+            output += "attributes:\n";
             for (Map.Entry attribute : node.getAttributesOrKeyValuePairs().entrySet()) {
                 output += attribute.getKey() + " = \"" + attribute.getValue() + "\"\n";
             }
