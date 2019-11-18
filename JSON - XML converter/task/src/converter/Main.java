@@ -29,7 +29,8 @@ public class Main {
 
 
         File file = new File("C:\\Users\\Michael\\Desktop\\JavaProjects\\JSON - XML converter\\JSON - XML converter\\task\\src" +
-                "\\test9.txt");
+                "\\test10.txt");
+//        File file = new File("test.txt");
         String input = "";
         try {
             try (Scanner scanner = new Scanner(file);){
@@ -52,8 +53,8 @@ public class Main {
         if (format.equalsIgnoreCase("XML")){
             //Convert XML -> JSON
 //            intermediaryFormat = convertJSONToIntermediaryFormat(parseJson(input), 0, "");
-            output = convertJSONToIntermediaryFormat(processXml(input),0,"");
-            System.out.println(output);
+            output = convertXMLToIntermediaryFormat(processXml(input),0,"");
+//            System.out.println(output);
             output = printAsJSON(output);
             System.out.println(output);
         } else if (format.equalsIgnoreCase("JSON")){
@@ -83,7 +84,7 @@ public class Main {
         //Patterns
         Pattern elementPattern = Pattern.compile("Element:");
         Pattern pathPattern = Pattern.compile("path = (.*)");
-        Pattern valuePattern = Pattern.compile("value = \"?([^\"]*)\"?");
+        Pattern valuePattern = Pattern.compile("value = (\"?[^\"]*\"?)");
         Pattern attributesPattern = Pattern.compile("attributes:");
         Pattern attributeParsePattern = Pattern.compile("([^\\s]*)\\s=\\s(.*)");
 
@@ -100,10 +101,12 @@ public class Main {
         boolean childElementEnd = false;
         boolean childStartFound = false;
 
+
         //Counters
         int bracketCounter = 0;
         int indentLevel = 0;
         int index = 0;
+
 
         //Recurring variables
         String prevPath = "";
@@ -116,12 +119,14 @@ public class Main {
         String curParentPath = "path = ";
         String prevFullPath = "";
         String curFullPath = "";
-        Path latestPath;
+        String prevKey = "";
+
 
         //Lists
         ArrayList<String> parentTags = new ArrayList<>();
         ArrayList<Path> pathList = new ArrayList<>();
         ArrayList<KeyValuePair> tempAttributeArray = new ArrayList<>();
+
 
         //Iterate through each line of input
         for (String line :
@@ -152,12 +157,6 @@ public class Main {
                 //If it's at the same level of the previous element, print comma
                 //If not, print closing brackets
 
-                //TODO:
-                //Ok, so you have it printing the key, then the value or additional values in brackets if needed
-                //You need have it handle the closing brackets
-                //You should probably run this a couple times to test and see, though.
-                //Just so you know how it runs.
-
                 output += getIndents(indentLevel) + "\"" + curElementKey + "\"" + ": ";
                 if (!curValue.equalsIgnoreCase("") && tempAttributeArray.size() == 0){
 
@@ -165,9 +164,8 @@ public class Main {
                     if (isChildElement){
                         output += ",\n";
                     }
-                    //HOW TO DEAL WITH COMMAS AND SUBSEQUENT ELEMENTS?
-                    //Set up a test in linePath.find() that triggers a isSubsequentElement flag.
-                    //Actually, you should be able to pull that off here.
+
+
                 } else if (tempAttributeArray.size() > 0){
                     output += "{\n";
                     //Increment indent level before printing attributes/values
@@ -203,26 +201,28 @@ public class Main {
 
 
 
+
                     //Close up the brackets at the end, decrease counters
                     //Add flag or counter for closing brackets for closing a brackets
-//                    if (closeBrackets){
-                        indentLevel--;
-                        output += getIndents(indentLevel) + "}";
-
-//                    }
+                    indentLevel--;
+                    output += getIndents(indentLevel) + "}";
 
 
-                    //Now output value, if there is one.
+
                 }
-                //If element has
+                //Set curValue to blank, so it isn't carried on to another element on accident
+                curValue = "";
+
+
+
             }
 
 
             //TODO:
             //Seems to be working fine.
             //NEED TO LOOK AT:
-            //  nonattr2 isn't printing empty brackets
-            //  attr2 isn't printing the blank value (somewhat similar to the above maybe?)
+            //  DONE - nonattr2 isn't printing empty brackets
+            //  DONE - attr2 isn't printing the blank value (somewhat similar to the above maybe?)
             //  email is all messed up. This may cause problems and is possibly the reason
             //    why I thought I needed to do things recursively in the first place.
             //    I THINK I may need to create an object to track child elements, because right
@@ -263,11 +263,25 @@ public class Main {
                         }
 
                     } else if (!childMatcherFound && childStartFound){
-                        //If it's not a child element, but you have previously been printing child elements
-                        //Need this so you can close up the brackets and start it as a new element
-                        childElementEnd = true;
-                        childStartFound = false;
-                        isChildElement = false;
+                        //First, check if it's moved on to yet another child element
+                        Pattern subsequentChildPattern = Pattern.compile(prevKey + ", " + curElementKey);
+                        Matcher subsequentChildMatcher = subsequentChildPattern.matcher(curPath);
+                        if (subsequentChildMatcher.find()){
+                            //A new child has started
+                            pause = true;
+                            isChildElement = true;
+                            indentLevel++;
+                            childStartFound = true;
+                            output += "{\n";
+                            prevParentKey = prevKey;
+                        } else {
+                            //If it's not a child element, but you have previously been printing child elements
+                            //Need this so you can close up the brackets and start it as a new element
+                            childElementEnd = true;
+                            childStartFound = false;
+                            isChildElement = false;
+                        }
+
                     } else {
                         isChildElement = false;
                         prevParentKey = curElementKey;
@@ -277,7 +291,8 @@ public class Main {
                     prevParentKey = curElementKey;
                 }
 
-
+                //Save previous key for later comparison to next element
+                prevKey = curElementKey;
                 //Save curPath as prevPath for comparison to next element.
                 prevPath = curPath;
             }
@@ -307,6 +322,17 @@ public class Main {
                 }
             }
 
+            //At the end Element:stop:
+            if (line.equalsIgnoreCase("Element:stop")){
+                //Close remaining brackets
+                for (int i = indentLevel; i > 0; i--) {
+                    indentLevel--;
+                    output += "\n" + getIndents(indentLevel) + "}";
+                }
+
+
+
+            }
 
 
         }
@@ -341,10 +367,13 @@ public class Main {
         boolean isChildElement = false;
         boolean finishElement = false;
         boolean closeParentTag = false;
+        boolean rootOrNot = false;
 
         //Counters
         int indentLevel = 0;
         int index = 0;
+        int rootTestCounter = 0;
+        int maxIndentLevel = 0;
 
         //Recurring variables
         String prevPath = "";
@@ -499,7 +528,12 @@ public class Main {
                     prevFullPath = curFullPath;
                 }
 
-
+                //Test for whether or not you need <root> here.
+                //basically, if there'd be only one child of root, do root.
+                //If there's more than one, trigger the rootOrNot flag so you can remove it at the end.
+                if (indentLevel == 1) {
+                    rootTestCounter++;
+                }
 
             }
             if (lineValue.find()){
@@ -518,6 +552,7 @@ public class Main {
                     output += " " + attribKey + "=" + attribValue;
                 }
             }
+            //This part runs at the very end
             if (line.equalsIgnoreCase("Element:stop")){
                 //If there's a value, print it with closing tag
 //                if (!curValue.equalsIgnoreCase("")){
@@ -528,9 +563,26 @@ public class Main {
                 } else {
                     output += ">";
                 }
-//                }
+                //Check for rootOrNot and delete root and remove extra indents if needed
+                if (rootTestCounter == 1 && pathList.size() == 0){
+                    //Remove root tags
+                    output = output.replaceAll("</?root>\n?","");
+                    //Remove 1 of each tab
+                    String tabReduceRegex = "";
+                    String tabReplaceString = "";
+                    for (int i = 1; i <= maxIndentLevel; i++) {
+                        tabReduceRegex = "[^\t]" + getIndents(i) + "[^\t]";
+                        tabReplaceString = getIndents(i-1);
+                        output = output.replaceAll(tabReduceRegex,tabReplaceString);
+                    }
+
+                }
             }
             index++;
+            //Keep track of maxIndentLevel to use with rootOrNot at end of conversion
+            if (maxIndentLevel < indentLevel){
+                maxIndentLevel = indentLevel;
+            }
         }
 
 
@@ -545,12 +597,35 @@ public class Main {
                 output += "\n" + getIndents(indentLevel) + "</" + lastParentTag + ">";
                 pathList.remove(i);
             }
+
+            //TODO:
+            //Fix the regex here. You need to grab N tabs and replace it with N-1 tabs
+
+
+
+            //Check for rootOrNot and delete root and remove extra indents if needed
+            if (rootTestCounter == 1){
+                //Remove root tags
+                output = output.replaceAll("\n?</?root>\n?","");
+                //Remove 1 of each tab
+                String tabReduceRegex = "";
+                String tabReplaceString = "";
+                for (int i = 1; i <= maxIndentLevel; i++) {
+                    tabReduceRegex = "[^\t](" + getIndents(i) + ")[^\t]";
+                    tabReplaceString = getIndents(i-1);
+                    Pattern tabReducePattern = Pattern.compile(tabReduceRegex);
+                    Matcher tabReduceMatcher = tabReducePattern.matcher(output);
+                    output = tabReduceMatcher.replaceAll(tabReplaceString);
+//                    output = output.replaceAll(tabReduceRegex,tabReplaceString);
+                }
+
+            }
         }
 
         return output;
     }
 
-    public static String convertJSONToIntermediaryFormat(Node node, int depth, String path) {
+    public static String convertXMLToIntermediaryFormat(Node node, int depth, String path) {
         path = (path).equalsIgnoreCase("") ? node.elementKey : path + ", " + node.elementKey;
         String output = "";
         output += "Element:\n";
@@ -572,8 +647,11 @@ public class Main {
         output += "\n";
         if (node.getChildren().size() > 0) {
             for (Node child : node.getChildren()) {
-                output += convertJSONToIntermediaryFormat((Node)child, depth, path);
+                output += convertXMLToIntermediaryFormat((Node)child, depth, path);
             }
+        }
+        if (depth == 1){
+            output += "\nElement:stop";
         }
         return output;
     }
