@@ -20,11 +20,8 @@ public class Main {
         // cant remember why i ever did it...
 
         //TODO:
-        //
-        //Create new KeyValuePair object
-        //It needs key, value String variables
-        //enum for is it an attribute, elementValue?
-        //boolean flag, is it invalid? Keep invalid info around for chuckles, may need it
+        //Work on fixing test 6
+        //It's doing some funky stuff
 
 
 
@@ -53,7 +50,8 @@ public class Main {
         if (format.equalsIgnoreCase("XML")){
             //Convert XML -> JSON
 //            intermediaryFormat = convertJSONToIntermediaryFormat(parseJson(input), 0, "");
-            output = convertXMLToIntermediaryFormat(processXml(input),0,"");
+            Node tempNode = processXml(input);
+            output = convertXMLToIntermediaryFormat(tempNode,0,"");
 //            System.out.println(output);
             output = printAsJSON(output);
             System.out.println(output);
@@ -87,6 +85,7 @@ public class Main {
         Pattern valuePattern = Pattern.compile("value = (\"?[^\"]*\"?)");
         Pattern attributesPattern = Pattern.compile("attributes:");
         Pattern attributeParsePattern = Pattern.compile("([^\\s]*)\\s=\\s(.*)");
+        Pattern childrenPattern = Pattern.compile("children = (.*)");
 
         //Flags
         boolean elementStart = false;
@@ -136,6 +135,8 @@ public class Main {
             Matcher lineValue = valuePattern.matcher(line);
             Matcher lineAttributes = attributesPattern.matcher(line);
             Matcher lineAttributesParse = attributeParsePattern.matcher(line);
+            Matcher children
+                    //add section to add stuff for childrens
 
             boolean pause = true;
             boolean elementHeaderFound = false;
@@ -189,6 +190,10 @@ public class Main {
                         output += "\n";
                         tempCounter++;
                     }
+                    if(tempCounter != tempAttributeArray.size()-1 || !curValue.equalsIgnoreCase("")){
+                        output = output.replaceFirst("\n?$",",\n");
+//                        output += ",";
+                    }
                     //Turn off attributesFound here so that it works right for the next element
                     attributesFound = false;
                     //Clear tempAttributeArray
@@ -218,16 +223,7 @@ public class Main {
             }
 
 
-            //TODO:
-            //Seems to be working fine.
-            //NEED TO LOOK AT:
-            //  DONE - nonattr2 isn't printing empty brackets
-            //  DONE - attr2 isn't printing the blank value (somewhat similar to the above maybe?)
-            //  email is all messed up. This may cause problems and is possibly the reason
-            //    why I thought I needed to do things recursively in the first place.
-            //    I THINK I may need to create an object to track child elements, because right
-            //    now it's just flags and I don't think it can be maintained properly once you have
-            //    children of children.
+
 
             //Start processing things on "path = ..."
             if (linePath.find()){
@@ -611,8 +607,8 @@ public class Main {
                 String tabReduceRegex = "";
                 String tabReplaceString = "";
                 for (int i = 1; i <= maxIndentLevel; i++) {
-                    tabReduceRegex = "[^\t](" + getIndents(i) + ")[^\t]";
-                    tabReplaceString = getIndents(i-1);
+                    tabReduceRegex = "([^\t]?)(" + getIndents(i) + ")([^\t])";
+                    tabReplaceString = "$1" + getIndents(i-1) + "$3";
                     Pattern tabReducePattern = Pattern.compile(tabReduceRegex);
                     Matcher tabReduceMatcher = tabReducePattern.matcher(output);
                     output = tabReduceMatcher.replaceAll(tabReplaceString);
@@ -643,9 +639,22 @@ public class Main {
                 output += attribute.getKey() + " = \"" + attribute.getValue() + "\"\n";
             }
         }
+        //Add line that lets you know what children are upcoming
+        if (node.getChildren().size() > 0) {
+            String tempChildrenString = "children = ";
+            for (Node child : node.getChildren()) {
+                tempChildrenString += child.getElementKey();
+                if (node.getChildren().indexOf(child) < node.getChildren().size() - 1) {
+                    tempChildrenString += "|";
+                }
+            }
+            output += tempChildrenString + "\n";
+        }
         ++depth;
         output += "\n";
+        //Process child Nodes
         if (node.getChildren().size() > 0) {
+
             for (Node child : node.getChildren()) {
                 output += convertXMLToIntermediaryFormat((Node)child, depth, path);
             }
@@ -989,56 +998,77 @@ public class Main {
         }
 //        }
         boolean attribHeaderPrinted = false;
+
+        //This flag makes sure it doesn't run the depth == 0 portion twice and print double
+        boolean depthZeroRan = false;
+
+        //Prevent printing a section twice
+        boolean hasBeenPrinted = false;
+
+        //Iterate through KeyValuePairs held within the root ValueArray
         if (input.getValueArray().size() > 0) {
             for (KeyValuePair keyValuePair : input.getValueArray()) {
-                String key;
-                Matcher attribMatcher = attribPattern.matcher(keyValuePair.getKey());
-                Matcher elementValueMatcher = elementValuePattern.matcher(keyValuePair.getKey());
-                boolean invalid = false;
-                if (attribMatcher.find()) {
-                    key = keyValuePair.getKey().replaceFirst("@", "");
-                    if (key.length() == 0) {
-                        invalid = true;
-                        continue;
-                    }
-                    if (depth != 0 && !attribHeaderPrinted) {
-                        output += "attributesOrKeyValuePairs:" + "\n";
-                        attribHeaderPrinted = true;
-                    }
-                    if (keyValuePair.getValue().equalsIgnoreCase("null")) {
-                        output += key + " = \"\"" + "\n";
-                        continue;
-                    }
-                    output += key + " = " + keyValuePair.getValue() + "\n";
-                    continue;
-                }
-                if (elementValueMatcher.find()) {
-                    key = keyValuePair.getKey().replaceFirst("#", "");
-                    if (keyValuePair.getValue().equalsIgnoreCase("") && keyValuePair.getValueArray().size() > 0) {
-                        for (KeyValuePair valueArrayKeyValuePair : keyValuePair.getValueArray()) {
-                            path = path + ", " + valueArrayKeyValuePair.getKey();
-                            String tempPath = path;
-                            output += convertJSONToIntermediaryFormat(valueArrayKeyValuePair, (depth + 1), tempPath);
-                            path = (path).replaceFirst(", " + valueArrayKeyValuePair.getKey(), "");
-                        }
-                        continue;
-                    }
-                    output += "value = " + keyValuePair.getValue() + "\n";
-                    continue;
-                }
+                //Do this if at depth of 0 AKA root
                 if (depth == 0) {
-                    for (KeyValuePair valueArrayKeyValuePair : input.getValueArray()) {
-                        path = path + ", " + valueArrayKeyValuePair.getKey();
-                        String tempPath = path;
-                        output += convertJSONToIntermediaryFormat(valueArrayKeyValuePair, (depth + 1), tempPath);
-                        path = (path).replaceFirst(", " + valueArrayKeyValuePair.getKey(), "");
-                    }
-//                     output += convertJSONToIntermediaryFormat(keyValuePair, (depth + 1), tempPath);
+                    path = path + ", " + keyValuePair.getKey();
+                    String tempPath = path;
+                    output += convertJSONToIntermediaryFormat(keyValuePair, (depth + 1), tempPath);
+                    path = (path).replaceFirst(", " + keyValuePair.getKey(), "");
+
+//                    for (KeyValuePair valueArrayKeyValuePair : input.getValueArray()) {
+//                        path = path + ", " + valueArrayKeyValuePair.getKey();
+//                        String tempPath = path;
+//                        output += convertJSONToIntermediaryFormat(valueArrayKeyValuePair, (depth + 1), tempPath);
+//                        path = (path).replaceFirst(", " + valueArrayKeyValuePair.getKey(), "");
+//                    }
+                    depthZeroRan = true;
+                    hasBeenPrinted = true;
                     continue;
+                } else {///ADDED THIS ONE HERE
+                    String key;
+                    Matcher attribMatcher = attribPattern.matcher(keyValuePair.getKey());
+                    Matcher elementValueMatcher = elementValuePattern.matcher(keyValuePair.getKey());
+                    boolean invalid = false;
+                    if (attribMatcher.find()) {
+                        key = keyValuePair.getKey().replaceFirst("@", "");
+                        if (key.length() == 0) {
+                            invalid = true;
+                            continue;
+                        }
+                        if (depth != 0 && !attribHeaderPrinted) {
+                            output += "attributes:" + "\n";
+                            attribHeaderPrinted = true;
+                        }
+                        if (keyValuePair.getValue().equalsIgnoreCase("null")) {
+                            output += key + " = \"\"" + "\n";
+                            continue;
+                        }
+                        output += key + " = " + keyValuePair.getValue() + "\n";
+                        continue;
+                    }
+                    if (elementValueMatcher.find()) {
+                        key = keyValuePair.getKey().replaceFirst("#", "");
+                        if (keyValuePair.getValue().equalsIgnoreCase("") && keyValuePair.getValueArray().size() > 0) {
+                            for (KeyValuePair valueArrayKeyValuePair : keyValuePair.getValueArray()) {
+                                path = path + ", " + valueArrayKeyValuePair.getKey();
+                                String tempPath = path;
+                                output += convertJSONToIntermediaryFormat(valueArrayKeyValuePair, (depth + 1), tempPath);
+                                path = (path).replaceFirst(", " + valueArrayKeyValuePair.getKey(), "");
+                            }
+                            continue;
+                        }
+                        output += "value = " + keyValuePair.getValue() + "\n";
+                        continue;
+                    } else {
+                        ///ADDED THIS ONE HERE
+                        //Do I need to change this?
+
+                        path = path + ", " + keyValuePair.getKey();
+                        output += convertJSONToIntermediaryFormat(keyValuePair, (depth + 1), path);
+                        path = (path).replaceFirst(",[^,]*$", "");
+                    }
                 }
-                path = path + ", " + keyValuePair.getKey();
-                output += convertJSONToIntermediaryFormat(keyValuePair, (depth + 1), path);
-                path = (path).replaceFirst(",[^,]*$", "");
+
             }
         }
         if (depth != 0) {
