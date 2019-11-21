@@ -25,9 +25,9 @@ public class Main {
 
 
 
-        File file = new File("C:\\Users\\Michael\\Desktop\\JavaProjects\\JSON - XML converter\\JSON - XML converter\\task\\src" +
-                "\\test10.txt");
-//        File file = new File("test.txt");
+//        File file = new File("C:\\Users\\Michael\\Desktop\\JavaProjects\\JSON - XML converter\\JSON - XML converter\\task\\src" +
+//                "\\test10.txt");
+        File file = new File("test.txt");
         String input = "";
         try {
             try (Scanner scanner = new Scanner(file);){
@@ -99,6 +99,7 @@ public class Main {
 //        boolean closeParentTag = false;
         boolean childElementEnd = false;
         boolean childStartFound = false;
+        boolean childrenFound = false;
 
 
         //Counters
@@ -135,8 +136,7 @@ public class Main {
             Matcher lineValue = valuePattern.matcher(line);
             Matcher lineAttributes = attributesPattern.matcher(line);
             Matcher lineAttributesParse = attributeParsePattern.matcher(line);
-            Matcher children
-                    //add section to add stuff for childrens
+            Matcher childrenMatcher = childrenPattern.matcher(line);
 
             boolean pause = true;
             boolean elementHeaderFound = false;
@@ -205,12 +205,18 @@ public class Main {
                     }
 
 
+                    //Print value for children elements
+                    if (childrenFound){
+                        output += getIndents(indentLevel) + "\"#" + curElementKey + "\": ";
+//                        indentLevel++;
+                    } else {
+                        //Close up the brackets at the end, decrease counters
+                        //Add flag or counter for closing brackets for closing a brackets
+                        indentLevel--;
+                        output += getIndents(indentLevel) + "}";
+                    }
 
 
-                    //Close up the brackets at the end, decrease counters
-                    //Add flag or counter for closing brackets for closing a brackets
-                    indentLevel--;
-                    output += getIndents(indentLevel) + "}";
 
 
 
@@ -218,7 +224,8 @@ public class Main {
                 //Set curValue to blank, so it isn't carried on to another element on accident
                 curValue = "";
 
-
+                //Reset childrenFound to false;
+                childrenFound = false;
 
             }
 
@@ -306,9 +313,15 @@ public class Main {
                 //Check for attributesOrKeyValuePairs header, get ready to parse attributesOrKeyValuePairs
                 attributesFound = true;
             }
+
+            //Keep track if there's children, so you can print everything correctly on the next "Element:"
+            if (childrenMatcher.find()){
+                childrenFound = true;
+            }
+
             if (attributesFound){
                 //Attributes found, parse as they come.
-                if (lineAttributesParse.find()){
+                if (lineAttributesParse.find() && !childrenFound){
                     KeyValuePair tempKeyValuePair = new KeyValuePair();
                     tempKeyValuePair.setKey(lineAttributesParse.group(1));
                     tempKeyValuePair.setValue(lineAttributesParse.group(2));
@@ -317,6 +330,8 @@ public class Main {
 //                    attributesFound = false;
                 }
             }
+
+
 
             //At the end Element:stop:
             if (line.equalsIgnoreCase("Element:stop")){
@@ -333,6 +348,8 @@ public class Main {
 
         }
 
+        //Remove excess commas
+        output = output.replaceAll(",,",",");
         return output;
     }
 
