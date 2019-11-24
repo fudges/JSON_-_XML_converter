@@ -1,0 +1,33 @@
+.idea
+build.gradle
+.gradle/
+gradlew
+gradlew.bat
+gradle/wrapper/gradle-wrapper.jar
+gradle/wrapper/gradle-wrapper.properties
+JSON - XML converter/task/build/classes/java/test/Clue.class
+JSON - XML converter/task/build/classes/java/test/ConverterTest.class
+JSON - XML converter/task/build/reports/tests/test/classes/ConverterTest.html
+JSON - XML converter/task/build/reports/tests/test/css/base-style.css
+JSON - XML converter/task/build/reports/tests/test/css/style.css
+JSON - XML converter/task/build/reports/tests/test/index.html
+JSON - XML converter/task/build/reports/tests/test/js/report.js
+JSON - XML converter/task/build/reports/tests/test/packages/default-package.html
+JSON - XML converter/task/build/test-results/test/binary/output.bin
+JSON - XML converter/task/build/test-results/test/binary/output.bin.idx
+JSON - XML converter/task/build/test-results/test/binary/results.bin
+JSON - XML converter/task/build/test-results/test/TEST-ConverterTest.xml
+JSON - XML converter/task/build/tmp/test/
+JSON - XML converter/task/src/test10.txt
+JSON - XML converter/task/src/test10end.txt
+JSON - XML converter/task/src/test5.txt
+JSON - XML converter/task/src/test6.txt
+JSON - XML converter/task/src/test7.txt
+JSON - XML converter/task/src/test7full.txt
+JSON - XML converter/task/src/test9.txt
+JSON - XML converter/task/src/test9end.txt
+JSON - XML converter/task/src/test9full.txt
+JSON - XML converter/task/test/ConverterTest.java
+out/production/JSON_-_XML_converter/META-INF/JSON_-_XML_converter.kotlin_module
+settings.gradle
+JSON - XML converter/task/out/production/classes/META-INF/JSON_-_XML_converter-task_main.kotlin_module
