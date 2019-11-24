@@ -1,0 +1,4 @@
+<elem1 attr1="val1" attr2="val2">
+    <elem2 attr3="val3" attr4="val4">Value1</elem2>
+    <elem3 attr5="val5" attr6="val6">Value2</elem3>
+</elem1>

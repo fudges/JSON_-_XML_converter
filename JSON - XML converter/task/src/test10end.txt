@@ -1,0 +1,18 @@
+{
+    "elem1": {
+        "@attr1": "val1",
+        "@attr2": "val2",
+        "#elem1": {
+            "elem2": {
+                "@attr3": "val3",
+                "@attr4": "val4",
+                "#elem2": "Value1"
+            },
+            "elem3": {
+                "@attr5": "val5",
+                "@attr6": "val6",
+                "#elem3": "Value2"
+            }
+        }
+    }
+}
