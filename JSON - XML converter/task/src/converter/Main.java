@@ -27,7 +27,7 @@ public class Main {
 //        File file = new File("test.txt");
         String input = "";
         try {
-            try (Scanner scanner = new Scanner(file);){
+            try (Scanner scanner = new Scanner(file)){
                 while (scanner.hasNext()) {
                     input = input + scanner.nextLine();
                 }
@@ -926,17 +926,68 @@ public class Main {
     public static KeyValuePair parseJsonBrackets(String input) {
         KeyValuePair keyValuePair = new KeyValuePair();
 
-        //Parse root brackets here?
         String keyValue = "";
-        String inputDebug = input;
+
+        //Determine bracket type
+        String bracketType = "";
+        Pattern curleyBracketDetectPattern = Pattern.compile("^\\{.*}$");
+        Matcher curleyBracketDetectMatcher = curleyBracketDetectPattern.matcher(input);
+        Pattern arrayBracketDetectPattern = Pattern.compile("^\\[.*]$");
+        Matcher arrayBracketDetectMatcher = arrayBracketDetectPattern.matcher(input);
+
+        if (curleyBracketDetectMatcher.find()){
+            bracketType = "curley";
+        } else if (arrayBracketDetectMatcher.find()){
+            bracketType = "array";
+        }
+
+
+
+        //Detect empty curly brackets, return blank value
         Pattern emptyBracketsPattern = Pattern.compile("^\\{\\s*}$");
         Matcher emptyBracketsMatcher = emptyBracketsPattern.matcher(input);
         if (emptyBracketsMatcher.find()) {
             keyValuePair.setValue("");
             return keyValuePair;
         }
-        input = input.strip().replaceAll("^\\{", "").replaceAll("}$", "");
+        //Detect empty array brackets, return blank value
+        Pattern emptyArrayBracketsPattern = Pattern.compile("^\\[\\s*]$");
+        Matcher emptyArrayBracketsMatcher = emptyArrayBracketsPattern.matcher(input);
+        if (emptyArrayBracketsMatcher.find()){
+            keyValuePair.setValue("");
+            return keyValuePair;
+        }
+//        input = input.strip().replaceAll("^\\{", "").replaceAll("}$", "");
+        input = input.strip().replaceAll("^(\\{|\\[)", "").replaceAll("(}|])$", "");
         input = input.replaceAll("\\s+", " ");
+
+        //Process if arrayBrackets
+        if (bracketType.equalsIgnoreCase("array")){
+            String[] arrayValues = input.split(",");
+
+//            KeyValuePair arrayKeyValuePair = new KeyValuePair();
+            for (String value :
+                    arrayValues) {
+                KeyValuePair tempArrayKeyValuePair = new KeyValuePair();
+                //Check if the value contains brackets, if so process it recursively
+                //If not, set value and continue on
+                Pattern bracketDetectPattern = Pattern.compile("^\\[.*]$|^\\{.*}$");
+                Matcher bracketDetectMatcher = bracketDetectPattern.matcher(value);
+                if (bracketDetectMatcher.find()){
+                    tempArrayKeyValuePair = parseJsonBrackets(value);
+                } else {
+                    tempArrayKeyValuePair.setValue(value);
+                }
+
+                keyValuePair.addToValueArray(tempArrayKeyValuePair);
+            }
+            return keyValuePair;
+        }
+        //TODO:
+        //I added the ability to parse arrayBrackets, step through the application
+        //  and see how it's performing and where you need to make changes.
+
+
         ArrayList<String> keyValueArray = new ArrayList<String>();
         String stop = "";
         String processedInput = "";
