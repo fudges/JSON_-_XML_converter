@@ -9,15 +9,12 @@ import java.util.Scanner;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/*
- * Exception performing whole class analysis ignored.
- */
+
 public class Main {
     public static void main(String[] args) {
 
         //I really think I should rewrite this entire thing.
-        //The keyvaluepair with nested nodes seems really confusing to me.
-        // cant remember why i ever did it...
+        //Come back and do it after you've completed another project
 
         //TODO:
         //Work on fixing test 6
@@ -25,9 +22,9 @@ public class Main {
 
 
 
-//        File file = new File("C:\\Users\\Michael\\Desktop\\JavaProjects\\JSON - XML converter\\JSON - XML converter\\task\\src" +
-//                "\\test10.txt");
-        File file = new File("test.txt");
+        File file = new File("C:\\Users\\Michael\\Desktop\\JavaProjects\\JSON - XML converter\\JSON - XML converter\\task\\src" +
+                "\\test10.txt");
+//        File file = new File("test.txt");
         String input = "";
         try {
             try (Scanner scanner = new Scanner(file);){
@@ -780,15 +777,6 @@ public class Main {
     }
 
     public static KeyValuePair parseJson(String input) {
-        //Test for root brackets
-        //HEY!! Does this go here or somewhere else?
-        //Test for root brackets
-        /*
-        TODO:
-        -turn this part back on
-        -figure out why it ain't working
-        -It isn't properly adding in the root
-        */
         Pattern rootPattern = Pattern.compile("^\\{.*}$");
         Matcher rootMatcher = rootPattern.matcher(input);
         if (rootMatcher.find()){
