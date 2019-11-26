@@ -17,8 +17,7 @@ public class Main {
         //Come back and do it after you've completed another project
 
         //TODO:
-        //Work on fixing test 6
-        //It's doing some funky stuff
+        //Really need to start this thing over again.
 
 
 
@@ -799,28 +798,53 @@ public class Main {
         String leftovers = "";
         String returnString = "";
         int bracketCounter = 0;
+        int arrayBracketCounter = 0;
         boolean colonFound = false;
         boolean bracketFound = false;
+        boolean arrayBracketFound = false;
         boolean nextFound = false;
+        String nextChar = "";
+        String prevChar = "";
         Character[] inputCharArray = (Character[])input.chars().mapToObj(c -> Character.valueOf((char)c)).toArray(x$0 -> new Character[x$0]);
         boolean endFound = false;
         for (Character inputChar : inputCharArray) {
+            nextChar = inputChar.toString();
             if (!endFound) {
                 if (inputChar.toString().equalsIgnoreCase("{")) {
-                    bracketFound = true;
                     ++bracketCounter;
                 } else if (inputChar.toString().equalsIgnoreCase("}")) {
                     --bracketCounter;
+                }
+                if (inputChar.toString().equalsIgnoreCase("[")){
+                    ++arrayBracketCounter;
+                    arrayBracketFound = true;
+                } else if(inputChar.toString().equalsIgnoreCase("]")){
+                    --arrayBracketCounter;
                 }
                 if (inputChar.toString().equalsIgnoreCase(":")) {
                     colonFound = true;
                 }
                 keyValueString = keyValueString + inputChar.toString();
-                if (bracketCounter != 0 || !inputChar.toString().equalsIgnoreCase(",")) continue;
+                //If bracketcounter is zero and you found a comma (means its followed by the next element
+                if ((bracketCounter != 0 || !inputChar.toString().equalsIgnoreCase(","))
+                        //Or if you've seen arraybrackets, but the counter is zero
+                        //OR If you have either seen no array brackets
+                        && ((arrayBracketFound && arrayBracketCounter != 0) || !arrayBracketFound)) {
+                    //Replace the array bracket if needed
+                    if (inputChar.toString().equalsIgnoreCase("[")){
+                        keyValueString = keyValueString.substring(0,keyValueString.length()-1);
+                        leftovers += "[";
+                    }
+                    boolean pause1 = true;
+                    prevChar = inputChar.toString();
+                    continue;
+                }
+                //If it doesn't hit continue up above, mark the endFound which will start adding the rest to leftovers
                 endFound = true;
                 continue;
             }
             leftovers = leftovers + inputChar.toString();
+            prevChar = inputChar.toString();
         }
         if (!colonFound || (leftovers).length() == 0) {
             leftovers = ">>>END<<<";
