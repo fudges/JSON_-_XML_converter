@@ -27,7 +27,10 @@ public class Main {
 
 //        File file = new File("C:\\Users\\Michael\\Desktop\\JavaProjects\\JSON - XML converter\\JSON - XML converter\\task\\src" +
 //                "\\test10.txt");
-        File file = new File("test.txt");
+        File file = new File("C:\\Users\\mcarner\\Documents\\GitHub\\JSON_-_XML_converter\\JSON - XML converter\\task\\src" +
+                "\\test10.txt");
+
+//        File file = new File("test.txt");
         String input = "";
         try {
             try (Scanner scanner = new Scanner(file);){
@@ -71,6 +74,352 @@ public class Main {
             System.out.println("Could not detect format, exiting");
         }
     }
+
+
+    //<editor-fold desc="Json to XML portion">
+    public static String isJsonOrXml(String input) {
+        String[] inputArray = (input).split("");
+        String inputType = "";
+        if (inputArray[0].equalsIgnoreCase("<")) {
+            inputType = "XML";
+        } else if (inputArray[0].equalsIgnoreCase("{")) {
+            inputType = "JSON";
+        } else {
+            inputType = "ERROR: Could not determine type";
+        }
+        return inputType;
+    }
+
+    public static KeyValuePair parseJson(String input) {
+        //Test for root brackets
+        //HEY!! Does this go here or somewhere else?
+        //Test for root brackets
+        /*
+        TODO:
+        -turn this part back on
+        -figure out why it ain't working
+        -It isn't properly adding in the root
+        */
+        Pattern rootPattern = Pattern.compile("^\\{.*}$");
+        Matcher rootMatcher = rootPattern.matcher(input);
+        if (rootMatcher.find()){
+            KeyValuePair rootPair = new KeyValuePair();
+
+            rootPair.setKey("root");
+            for (KeyValuePair keyValuePair :
+                    parseJsonBrackets(input).getValueArray()) {
+                rootPair.addToValueArray(keyValuePair);
+            }
+            return rootPair;
+        } else {
+            return parseJsonBrackets(input);
+        }
+
+    }
+
+    public static String detectJsonKeyValuePairs(String input) {
+        String keyValueString = "";
+        String leftovers = "";
+        String returnString = "";
+        int bracketCounter = 0;
+        boolean colonFound = false;
+        boolean bracketFound = false;
+        boolean nextFound = false;
+        Character[] inputCharArray = (Character[])input.chars().mapToObj(c -> Character.valueOf((char)c)).toArray(x$0 -> new Character[x$0]);
+        boolean endFound = false;
+        for (Character inputChar : inputCharArray) {
+            if (!endFound) {
+                if (inputChar.toString().equalsIgnoreCase("{")) {
+                    bracketFound = true;
+                    ++bracketCounter;
+                } else if (inputChar.toString().equalsIgnoreCase("}")) {
+                    --bracketCounter;
+                }
+                if (inputChar.toString().equalsIgnoreCase(":")) {
+                    colonFound = true;
+                }
+                keyValueString = keyValueString + inputChar.toString();
+                if (bracketCounter != 0 || !inputChar.toString().equalsIgnoreCase(",")) continue;
+                endFound = true;
+                continue;
+            }
+            leftovers = leftovers + inputChar.toString();
+        }
+        if (!colonFound || (leftovers).length() == 0) {
+            leftovers = ">>>END<<<";
+        }
+        returnString = keyValueString + "~~split~~" + leftovers;
+        return returnString;
+    }
+
+    public static KeyValuePair parseJsonKeyValuePair(String input, boolean invalid) {
+        Matcher invalidKeyMatcher;
+        Pattern invalidKeyPattern;
+        KeyValuePair keyValuePair = new KeyValuePair();
+        if (invalid) {
+            keyValuePair.setInvalid(true);
+        }
+        Pattern keyPattern = Pattern.compile("\"([^\"]*)\"");
+        Matcher keyMatcher = keyPattern.matcher(input);
+        String key = "";
+        if (keyMatcher.find()) {
+            key = keyMatcher.group(1);
+        }
+        if ((invalidKeyMatcher = (invalidKeyPattern = Pattern.compile("^@$|^#$")).matcher(key)).find() || key.length() == 0) {
+            keyValuePair.setKey("&&&INVALID&&&");
+            return keyValuePair;
+        }
+        if (invalid) {
+            key = key.replaceFirst("^#", "");
+        }
+        keyValuePair.setKey(key);
+        String value = "";
+        Pattern valueBracketPattern = Pattern.compile("(\\{.*})");
+        Matcher valueBracketMatcher = valueBracketPattern.matcher(input);
+        Pattern valuePattern = Pattern.compile("\"[^\"]*\"\\s*:\\s*([^{,]*)");
+        Matcher valueMatcher = valuePattern.matcher(input);
+        if (valueBracketMatcher.find()) {
+            ArrayList tempArray = parseJsonBrackets(valueBracketMatcher.group(1)).getValueArray();
+            for (Object parsedKeyValuePairs : tempArray) {
+                keyValuePair.addToValueArray((KeyValuePair)parsedKeyValuePairs);
+            }
+            boolean pause = true;
+            boolean invalidFlag = false;
+            boolean attrCheck = false;
+            boolean valueCheck = false;
+            int attribCount = 0;
+            int elementValueCount = 0;
+            for (int j = 0; j < keyValuePair.getValueArray().size(); ++j) {
+                KeyValuePair tempChild = keyValuePair.getValueArray().get(j);
+                String tempChildKey = tempChild.getKey();
+                String tempParentKey = keyValuePair.getKey();
+                if (tempChildKey.contains("@invalid_attr")) {
+                    pause = true;
+                }
+                if (tempChildKey.contains("@")) {
+                    ++attribCount;
+                    attrCheck = true;
+                    if (tempChild.getValueArray().size() > 0) {
+                        invalidFlag = true;
+                    }
+                }
+                if (!tempChildKey.contains("#")) continue;
+                ++elementValueCount;
+                valueCheck = true;
+                if ((tempChildKey = tempChildKey.replaceFirst("#", "")).equalsIgnoreCase(tempParentKey)) continue;
+                invalidFlag = true;
+            }
+            if (!(!attrCheck || attrCheck && valueCheck)) {
+                invalidFlag = true;
+            }
+            if (attribCount > 0 && elementValueCount > 0 && keyValuePair.getValueArray().size() > attribCount + elementValueCount) {
+                invalidFlag = true;
+            }
+            ArrayList<Integer> discardIndexArray = new ArrayList<Integer>();
+            if (invalidFlag) {
+                for (int j = 0; j < keyValuePair.getValueArray().size(); ++j) {
+                    String tempKey = (keyValuePair.getValueArray().get(j)).getKey();
+                    if (tempKey.contains("@") || tempKey.contains("#")) {
+                        tempKey = tempKey.replaceAll("^#|^@", "");
+                        boolean discard = false;
+                        for (int i = 0; i < keyValuePair.getValueArray().size(); ++i) {
+                            String keyToCompare = (keyValuePair.getValueArray().get(i)).getKey();
+                            if (!keyToCompare.equals(tempKey)) continue;
+                            discardIndexArray.add(j);
+                        }
+                    }
+                    if (discardIndexArray.contains(j)) continue;
+                    (keyValuePair.getValueArray().get(j)).setKey(tempKey);
+                }
+                for (int i = keyValuePair.getValueArray().size() - 1; i >= 0; --i) {
+                    if (!discardIndexArray.contains(i)) continue;
+                    keyValuePair.getValueArray().remove(i);
+                }
+            }
+        } else if (valueMatcher.find()) {
+            value = valueMatcher.group(1);
+            if (!(value).contains("null") && !(value).trim().matches("^\".*\"$")) {
+                value = "\"" + value + "\"";
+            }
+            keyValuePair.setValue(value);
+        }
+        return keyValuePair;
+    }
+
+    public static KeyValuePair parseJsonBrackets(String input) {
+        KeyValuePair keyValuePair = new KeyValuePair();
+
+        //Parse root brackets here?
+        String keyValue = "";
+        String inputDebug = input;
+        Pattern emptyBracketsPattern = Pattern.compile("^\\{\\s*}$");
+        Matcher emptyBracketsMatcher = emptyBracketsPattern.matcher(input);
+        if (emptyBracketsMatcher.find()) {
+            keyValuePair.setValue("");
+            return keyValuePair;
+        }
+        input = input.strip().replaceAll("^\\{", "").replaceAll("}$", "");
+        input = input.replaceAll("\\s+", " ");
+        ArrayList<String> keyValueArray = new ArrayList<String>();
+        String stop = "";
+        String processedInput = "";
+        do {
+            processedInput = detectJsonKeyValuePairs(input);
+            String[] processedInputSplit = processedInput.split("~~split~~");
+            keyValueArray.add(processedInputSplit[0]);
+            if (processedInputSplit.length <= 1) continue;
+            input = processedInputSplit[1];
+        } while (!processedInput.contains(">>>END<<<"));
+        boolean invalidFlag = false;
+        Iterator i = keyValueArray.iterator();
+        while (i.hasNext()) {
+            String kvString = ((String)i.next()).trim();
+            KeyValuePair keyValuePairOutput = new KeyValuePair();
+            if (!invalidFlag) {
+                keyValuePairOutput = parseJsonKeyValuePair(kvString, false);
+                if (keyValuePairOutput.getKey().equalsIgnoreCase("&&&INVALID&&&")) {
+                    invalidFlag = true;
+                }
+            } else if (invalidFlag) {
+                keyValuePairOutput = parseJsonKeyValuePair(kvString, true);
+            }
+            if (keyValuePairOutput.getKey().equalsIgnoreCase("&&&INVALID&&&")) continue;
+            keyValuePair.addToValueArray(keyValuePairOutput);
+        }
+        if (invalidFlag) {
+            for (int j = 0; j < keyValuePair.getValueArray().size(); ++j) {
+                String tempKey = (keyValuePair.getValueArray().get(j)).getKey();
+                tempKey = tempKey.replaceAll("^#|^@", "");
+                (keyValuePair.getValueArray().get(j)).setKey(tempKey);
+            }
+        }
+        return keyValuePair;
+    }
+
+    public static String convertJSONToIntermediaryFormat(KeyValuePair input, int depth, String path) {
+        String output = "";
+        Pattern attribPattern = Pattern.compile("^@.*");
+        Pattern elementValuePattern = Pattern.compile("^#.*");
+//        if (depth != 0) {
+        if (depth > 0) {
+            output += "\n";
+        }
+        output += "Element:\n";
+        output += "path = " + path + "\n";
+        if (input.getValue().equalsIgnoreCase("") && input.getValueArray().size() == 0) {
+            if (input.getValue().equalsIgnoreCase("null")) {
+                output += "value = null"+ "\n";
+            } else {
+                output += "value = \"\""+ "\n";
+            }
+        } else if (!input.getValue().equalsIgnoreCase("") && input.getValueArray().size() == 0) {
+            output += "value = " + input.getValue()+ "\n";
+        }
+        Iterator i = input.getValueArray().iterator();
+        while (i.hasNext()) {
+            KeyValuePair temp = (KeyValuePair) i.next();
+            Matcher elementValueMatcher = elementValuePattern.matcher(temp.getKey());
+            if (!elementValueMatcher.find() || temp.getValueArray().size() != 0) continue;
+            output += "value = " + temp.getValue() + "\n";
+            i.remove();
+            break;
+        }
+//        }
+        boolean attribHeaderPrinted = false;
+
+        //This flag makes sure it doesn't run the depth == 0 portion twice and print double
+        boolean depthZeroRan = false;
+
+        //Prevent printing a section twice
+        boolean hasBeenPrinted = false;
+
+        //Iterate through KeyValuePairs held within the root ValueArray
+        if (input.getValueArray().size() > 0) {
+            for (KeyValuePair keyValuePair : input.getValueArray()) {
+                //Do this if at depth of 0 AKA root
+                if (depth == 0) {
+                    path = path + ", " + keyValuePair.getKey();
+                    String tempPath = path;
+                    output += convertJSONToIntermediaryFormat(keyValuePair, (depth + 1), tempPath);
+                    path = (path).replaceFirst(", " + keyValuePair.getKey(), "");
+
+//                    for (KeyValuePair valueArrayKeyValuePair : input.getValueArray()) {
+//                        path = path + ", " + valueArrayKeyValuePair.getKey();
+//                        String tempPath = path;
+//                        output += convertJSONToIntermediaryFormat(valueArrayKeyValuePair, (depth + 1), tempPath);
+//                        path = (path).replaceFirst(", " + valueArrayKeyValuePair.getKey(), "");
+//                    }
+                    depthZeroRan = true;
+                    hasBeenPrinted = true;
+                    continue;
+                } else {///ADDED THIS ONE HERE
+                    String key;
+                    Matcher attribMatcher = attribPattern.matcher(keyValuePair.getKey());
+                    Matcher elementValueMatcher = elementValuePattern.matcher(keyValuePair.getKey());
+                    boolean invalid = false;
+                    if (attribMatcher.find()) {
+                        key = keyValuePair.getKey().replaceFirst("@", "");
+                        if (key.length() == 0) {
+                            invalid = true;
+                            continue;
+                        }
+                        if (depth != 0 && !attribHeaderPrinted) {
+                            output += "attributes:" + "\n";
+                            attribHeaderPrinted = true;
+                        }
+                        if (keyValuePair.getValue().equalsIgnoreCase("null")) {
+                            output += key + " = \"\"" + "\n";
+                            continue;
+                        }
+                        output += key + " = " + keyValuePair.getValue() + "\n";
+                        continue;
+                    }
+                    if (elementValueMatcher.find()) {
+                        key = keyValuePair.getKey().replaceFirst("#", "");
+                        if (keyValuePair.getValue().equalsIgnoreCase("") && keyValuePair.getValueArray().size() > 0) {
+                            for (KeyValuePair valueArrayKeyValuePair : keyValuePair.getValueArray()) {
+                                path = path + ", " + valueArrayKeyValuePair.getKey();
+                                String tempPath = path;
+                                output += convertJSONToIntermediaryFormat(valueArrayKeyValuePair, (depth + 1), tempPath);
+                                path = (path).replaceFirst(", " + valueArrayKeyValuePair.getKey(), "");
+                            }
+                            continue;
+                        }
+                        output += "value = " + keyValuePair.getValue() + "\n";
+                        continue;
+                    } else {
+                        ///ADDED THIS ONE HERE
+                        //Do I need to change this?
+
+                        path = path + ", " + keyValuePair.getKey();
+                        output += convertJSONToIntermediaryFormat(keyValuePair, (depth + 1), path);
+                        path = (path).replaceFirst(",[^,]*$", "");
+                    }
+                }
+
+            }
+        }
+        if (depth != 0) {
+            boolean temp = true;
+        }
+        //add Element: to end to help printAsXML wrap things up after last elementKey
+        if (depth == 0){
+            output += "Element:stop\n";
+        }
+
+        return output;
+    }
+
+
+
+    public static String getIndents(int indentLevel){
+        String indents = "";
+        for (int i = 0; i < indentLevel; i++) {
+            indents += "\t";
+        }
+        return indents;
+    }
+    //</editor-fold>
 
     public static String printAsJSON(String input){
 
@@ -762,358 +1111,5 @@ public class Main {
         System.out.println("ERROR: No tag found");
         System.exit(1);
         return xmlNode;
-    }
-
-
-    //<editor-fold desc="Json to XML portion">
-    public static String isJsonOrXml(String input) {
-        String[] inputArray = (input).split("");
-        String inputType = "";
-        if (inputArray[0].equalsIgnoreCase("<")) {
-            inputType = "XML";
-        } else if (inputArray[0].equalsIgnoreCase("{")) {
-            inputType = "JSON";
-        } else {
-            inputType = "ERROR: Could not determine type";
-        }
-        return inputType;
-    }
-
-    public static KeyValuePair parseJson(String input) {
-        //Test for root brackets
-        //HEY!! Does this go here or somewhere else?
-        //Test for root brackets
-        /*
-        TODO:
-        -turn this part back on
-        -figure out why it ain't working
-        -It isn't properly adding in the root
-        */
-        Pattern rootPattern = Pattern.compile("^\\{.*}$");
-        Matcher rootMatcher = rootPattern.matcher(input);
-        if (rootMatcher.find()){
-            KeyValuePair rootPair = new KeyValuePair();
-
-            rootPair.setKey("root");
-            for (KeyValuePair keyValuePair :
-                    parseJsonBrackets(input).getValueArray()) {
-                rootPair.addToValueArray(keyValuePair);
-            }
-            return rootPair;
-        } else {
-            return parseJsonBrackets(input);
-        }
-
-    }
-
-    public static String detectJsonKeyValuePairs(String input) {
-        String keyValueString = "";
-        String leftovers = "";
-        String returnString = "";
-        int bracketCounter = 0;
-        boolean colonFound = false;
-        boolean bracketFound = false;
-        boolean nextFound = false;
-        Character[] inputCharArray = (Character[])input.chars().mapToObj(c -> Character.valueOf((char)c)).toArray(x$0 -> new Character[x$0]);
-        boolean endFound = false;
-        for (Character inputChar : inputCharArray) {
-            if (!endFound) {
-                if (inputChar.toString().equalsIgnoreCase("{")) {
-                    bracketFound = true;
-                    ++bracketCounter;
-                } else if (inputChar.toString().equalsIgnoreCase("}")) {
-                    --bracketCounter;
-                }
-                if (inputChar.toString().equalsIgnoreCase(":")) {
-                    colonFound = true;
-                }
-                keyValueString = keyValueString + inputChar.toString();
-                if (bracketCounter != 0 || !inputChar.toString().equalsIgnoreCase(",")) continue;
-                endFound = true;
-                continue;
-            }
-            leftovers = leftovers + inputChar.toString();
-        }
-        if (!colonFound || (leftovers).length() == 0) {
-            leftovers = ">>>END<<<";
-        }
-        returnString = keyValueString + "~~split~~" + leftovers;
-        return returnString;
-    }
-
-    public static KeyValuePair parseJsonKeyValuePair(String input, boolean invalid) {
-        Matcher invalidKeyMatcher;
-        Pattern invalidKeyPattern;
-        KeyValuePair keyValuePair = new KeyValuePair();
-        if (invalid) {
-            keyValuePair.setInvalid(true);
-        }
-        Pattern keyPattern = Pattern.compile("\"([^\"]*)\"");
-        Matcher keyMatcher = keyPattern.matcher(input);
-        String key = "";
-        if (keyMatcher.find()) {
-            key = keyMatcher.group(1);
-        }
-        if ((invalidKeyMatcher = (invalidKeyPattern = Pattern.compile("^@$|^#$")).matcher(key)).find() || key.length() == 0) {
-            keyValuePair.setKey("&&&INVALID&&&");
-            return keyValuePair;
-        }
-        if (invalid) {
-            key = key.replaceFirst("^#", "");
-        }
-        keyValuePair.setKey(key);
-        String value = "";
-        Pattern valueBracketPattern = Pattern.compile("(\\{.*})");
-        Matcher valueBracketMatcher = valueBracketPattern.matcher(input);
-        Pattern valuePattern = Pattern.compile("\"[^\"]*\"\\s*:\\s*([^{,]*)");
-        Matcher valueMatcher = valuePattern.matcher(input);
-        if (valueBracketMatcher.find()) {
-            ArrayList tempArray = parseJsonBrackets(valueBracketMatcher.group(1)).getValueArray();
-            for (Object parsedKeyValuePairs : tempArray) {
-                keyValuePair.addToValueArray((KeyValuePair)parsedKeyValuePairs);
-            }
-            boolean pause = true;
-            boolean invalidFlag = false;
-            boolean attrCheck = false;
-            boolean valueCheck = false;
-            int attribCount = 0;
-            int elementValueCount = 0;
-            for (int j = 0; j < keyValuePair.getValueArray().size(); ++j) {
-                KeyValuePair tempChild = keyValuePair.getValueArray().get(j);
-                String tempChildKey = tempChild.getKey();
-                String tempParentKey = keyValuePair.getKey();
-                if (tempChildKey.contains("@invalid_attr")) {
-                    pause = true;
-                }
-                if (tempChildKey.contains("@")) {
-                    ++attribCount;
-                    attrCheck = true;
-                    if (tempChild.getValueArray().size() > 0) {
-                        invalidFlag = true;
-                    }
-                }
-                if (!tempChildKey.contains("#")) continue;
-                ++elementValueCount;
-                valueCheck = true;
-                if ((tempChildKey = tempChildKey.replaceFirst("#", "")).equalsIgnoreCase(tempParentKey)) continue;
-                invalidFlag = true;
-            }
-            if (!(!attrCheck || attrCheck && valueCheck)) {
-                invalidFlag = true;
-            }
-            if (attribCount > 0 && elementValueCount > 0 && keyValuePair.getValueArray().size() > attribCount + elementValueCount) {
-                invalidFlag = true;
-            }
-            ArrayList<Integer> discardIndexArray = new ArrayList<Integer>();
-            if (invalidFlag) {
-                for (int j = 0; j < keyValuePair.getValueArray().size(); ++j) {
-                    String tempKey = (keyValuePair.getValueArray().get(j)).getKey();
-                    if (tempKey.contains("@") || tempKey.contains("#")) {
-                        tempKey = tempKey.replaceAll("^#|^@", "");
-                        boolean discard = false;
-                        for (int i = 0; i < keyValuePair.getValueArray().size(); ++i) {
-                            String keyToCompare = (keyValuePair.getValueArray().get(i)).getKey();
-                            if (!keyToCompare.equals(tempKey)) continue;
-                            discardIndexArray.add(j);
-                        }
-                    }
-                    if (discardIndexArray.contains(j)) continue;
-                    (keyValuePair.getValueArray().get(j)).setKey(tempKey);
-                }
-                for (int i = keyValuePair.getValueArray().size() - 1; i >= 0; --i) {
-                    if (!discardIndexArray.contains(i)) continue;
-                    keyValuePair.getValueArray().remove(i);
-                }
-            }
-        } else if (valueMatcher.find()) {
-            value = valueMatcher.group(1);
-            if (!(value).contains("null") && !(value).trim().matches("^\".*\"$")) {
-                value = "\"" + value + "\"";
-            }
-            keyValuePair.setValue(value);
-        }
-        return keyValuePair;
-    }
-
-    public static KeyValuePair parseJsonBrackets(String input) {
-        KeyValuePair keyValuePair = new KeyValuePair();
-
-        //Parse root brackets here?
-        String keyValue = "";
-        String inputDebug = input;
-        Pattern emptyBracketsPattern = Pattern.compile("^\\{\\s*}$");
-        Matcher emptyBracketsMatcher = emptyBracketsPattern.matcher(input);
-        if (emptyBracketsMatcher.find()) {
-            keyValuePair.setValue("");
-            return keyValuePair;
-        }
-        input = input.strip().replaceAll("^\\{", "").replaceAll("}$", "");
-        input = input.replaceAll("\\s+", " ");
-        ArrayList<String> keyValueArray = new ArrayList<String>();
-        String stop = "";
-        String processedInput = "";
-        do {
-            processedInput = detectJsonKeyValuePairs(input);
-            String[] processedInputSplit = processedInput.split("~~split~~");
-            keyValueArray.add(processedInputSplit[0]);
-            if (processedInputSplit.length <= 1) continue;
-            input = processedInputSplit[1];
-        } while (!processedInput.contains(">>>END<<<"));
-        boolean invalidFlag = false;
-        Iterator i = keyValueArray.iterator();
-        while (i.hasNext()) {
-            String kvString = ((String)i.next()).trim();
-            KeyValuePair keyValuePairOutput = new KeyValuePair();
-            if (!invalidFlag) {
-                keyValuePairOutput = parseJsonKeyValuePair(kvString, false);
-                if (keyValuePairOutput.getKey().equalsIgnoreCase("&&&INVALID&&&")) {
-                    invalidFlag = true;
-                }
-            } else if (invalidFlag) {
-                keyValuePairOutput = parseJsonKeyValuePair(kvString, true);
-            }
-            if (keyValuePairOutput.getKey().equalsIgnoreCase("&&&INVALID&&&")) continue;
-            keyValuePair.addToValueArray(keyValuePairOutput);
-        }
-        if (invalidFlag) {
-            for (int j = 0; j < keyValuePair.getValueArray().size(); ++j) {
-                String tempKey = (keyValuePair.getValueArray().get(j)).getKey();
-                tempKey = tempKey.replaceAll("^#|^@", "");
-                (keyValuePair.getValueArray().get(j)).setKey(tempKey);
-            }
-        }
-        return keyValuePair;
-    }
-
-    public static String convertJSONToIntermediaryFormat(KeyValuePair input, int depth, String path) {
-        String output = "";
-        Pattern attribPattern = Pattern.compile("^@.*");
-        Pattern elementValuePattern = Pattern.compile("^#.*");
-//        if (depth != 0) {
-        if (depth > 0) {
-            output += "\n";
-        }
-        output += "Element:\n";
-        output += "path = " + path + "\n";
-        if (input.getValue().equalsIgnoreCase("") && input.getValueArray().size() == 0) {
-            if (input.getValue().equalsIgnoreCase("null")) {
-                output += "value = null"+ "\n";
-            } else {
-                output += "value = \"\""+ "\n";
-            }
-        } else if (!input.getValue().equalsIgnoreCase("") && input.getValueArray().size() == 0) {
-            output += "value = " + input.getValue()+ "\n";
-        }
-        Iterator i = input.getValueArray().iterator();
-        while (i.hasNext()) {
-            KeyValuePair temp = (KeyValuePair) i.next();
-            Matcher elementValueMatcher = elementValuePattern.matcher(temp.getKey());
-            if (!elementValueMatcher.find() || temp.getValueArray().size() != 0) continue;
-            output += "value = " + temp.getValue() + "\n";
-            i.remove();
-            break;
-        }
-//        }
-        boolean attribHeaderPrinted = false;
-
-        //This flag makes sure it doesn't run the depth == 0 portion twice and print double
-        boolean depthZeroRan = false;
-
-        //Prevent printing a section twice
-        boolean hasBeenPrinted = false;
-
-        //Iterate through KeyValuePairs held within the root ValueArray
-        if (input.getValueArray().size() > 0) {
-            for (KeyValuePair keyValuePair : input.getValueArray()) {
-                //Do this if at depth of 0 AKA root
-                if (depth == 0) {
-                    path = path + ", " + keyValuePair.getKey();
-                    String tempPath = path;
-                    output += convertJSONToIntermediaryFormat(keyValuePair, (depth + 1), tempPath);
-                    path = (path).replaceFirst(", " + keyValuePair.getKey(), "");
-
-//                    for (KeyValuePair valueArrayKeyValuePair : input.getValueArray()) {
-//                        path = path + ", " + valueArrayKeyValuePair.getKey();
-//                        String tempPath = path;
-//                        output += convertJSONToIntermediaryFormat(valueArrayKeyValuePair, (depth + 1), tempPath);
-//                        path = (path).replaceFirst(", " + valueArrayKeyValuePair.getKey(), "");
-//                    }
-                    depthZeroRan = true;
-                    hasBeenPrinted = true;
-                    continue;
-                } else {///ADDED THIS ONE HERE
-                    String key;
-                    Matcher attribMatcher = attribPattern.matcher(keyValuePair.getKey());
-                    Matcher elementValueMatcher = elementValuePattern.matcher(keyValuePair.getKey());
-                    boolean invalid = false;
-                    if (attribMatcher.find()) {
-                        key = keyValuePair.getKey().replaceFirst("@", "");
-                        if (key.length() == 0) {
-                            invalid = true;
-                            continue;
-                        }
-                        if (depth != 0 && !attribHeaderPrinted) {
-                            output += "attributes:" + "\n";
-                            attribHeaderPrinted = true;
-                        }
-                        if (keyValuePair.getValue().equalsIgnoreCase("null")) {
-                            output += key + " = \"\"" + "\n";
-                            continue;
-                        }
-                        output += key + " = " + keyValuePair.getValue() + "\n";
-                        continue;
-                    }
-                    if (elementValueMatcher.find()) {
-                        key = keyValuePair.getKey().replaceFirst("#", "");
-                        if (keyValuePair.getValue().equalsIgnoreCase("") && keyValuePair.getValueArray().size() > 0) {
-                            for (KeyValuePair valueArrayKeyValuePair : keyValuePair.getValueArray()) {
-                                path = path + ", " + valueArrayKeyValuePair.getKey();
-                                String tempPath = path;
-                                output += convertJSONToIntermediaryFormat(valueArrayKeyValuePair, (depth + 1), tempPath);
-                                path = (path).replaceFirst(", " + valueArrayKeyValuePair.getKey(), "");
-                            }
-                            continue;
-                        }
-                        output += "value = " + keyValuePair.getValue() + "\n";
-                        continue;
-                    } else {
-                        ///ADDED THIS ONE HERE
-                        //Do I need to change this?
-
-                        path = path + ", " + keyValuePair.getKey();
-                        output += convertJSONToIntermediaryFormat(keyValuePair, (depth + 1), path);
-                        path = (path).replaceFirst(",[^,]*$", "");
-                    }
-                }
-
-            }
-        }
-        if (depth != 0) {
-            boolean temp = true;
-        }
-        //add Element: to end to help printAsXML wrap things up after last elementKey
-        if (depth == 0){
-            output += "Element:stop\n";
-        }
-
-        return output;
-    }
-
-
-
-    public static String getIndents(int indentLevel){
-        String indents = "";
-        for (int i = 0; i < indentLevel; i++) {
-            indents += "\t";
-        }
-        return indents;
-    }
-    //</editor-fold>
-
-    public static KeyValuePair parseXML(String input) {
-        String output = "";
-        KeyValuePair outputKeyValuePair = new KeyValuePair();
-
-        return outputKeyValuePair;
     }
 }
