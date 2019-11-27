@@ -118,12 +118,17 @@ public class Main {
     }
 
     public static String detectJsonKeyValuePairs(String input) {
+        //This finds the very first keyValuePair and sends the rest back as leftovers
+
+
         String keyValueString = "";
         String leftovers = "";
         String returnString = "";
         int bracketCounter = 0;
+        int arrayBracketCounter = 0;
         boolean colonFound = false;
         boolean bracketFound = false;
+        boolean arrayBracketFound = false;
         boolean nextFound = false;
         Character[] inputCharArray = (Character[])input.chars().mapToObj(c -> Character.valueOf((char)c)).toArray(x$0 -> new Character[x$0]);
         boolean endFound = false;
@@ -135,15 +140,31 @@ public class Main {
                 } else if (inputChar.toString().equalsIgnoreCase("}")) {
                     --bracketCounter;
                 }
+                if (inputChar.toString().equalsIgnoreCase("[")) {
+                    arrayBracketFound = true;
+                    ++arrayBracketCounter;
+                } else if (inputChar.toString().equalsIgnoreCase("]")) {
+                    --arrayBracketCounter;
+                }
                 if (inputChar.toString().equalsIgnoreCase(":")) {
                     colonFound = true;
                 }
                 keyValueString = keyValueString + inputChar.toString();
-                if (bracketCounter != 0 || !inputChar.toString().equalsIgnoreCase(",")) continue;
-                endFound = true;
-                continue;
+                //Split up keyValuePairs here
+                //If the end of the keyValuePair is found, flip endFound to true and spit the rest out to leftovers
+                if (!arrayBracketFound && bracketCounter == 0 && inputChar.toString().equalsIgnoreCase(",")){
+                    endFound = true;
+                }
+                if (arrayBracketFound && arrayBracketCounter == 0 && bracketCounter == 0 && inputChar.toString().equalsIgnoreCase(",")) {
+                    endFound = true;
+                }
+//                if (bracketCounter != 0 || !inputChar.toString().equalsIgnoreCase(",")) continue;
+//                endFound = true;
+//                continue;
+            }else {
+                leftovers = leftovers + inputChar.toString();
             }
-            leftovers = leftovers + inputChar.toString();
+
         }
         if (!colonFound || (leftovers).length() == 0) {
             leftovers = ">>>END<<<";
@@ -245,6 +266,15 @@ public class Main {
         }
         return keyValuePair;
     }
+
+    //TODO:
+    //You're doing great. It's correctly parsing stuff
+    //parseJsonBrackets() makes it to id:
+    //time to make sure it parses the arrayBrackets correctly
+    //You'll probably have to add those patterns and matchers in for it
+    //And then maybe a new method to handle all that junk.
+
+
 
     public static KeyValuePair parseJsonBrackets(String input) {
         KeyValuePair keyValuePair = new KeyValuePair();
