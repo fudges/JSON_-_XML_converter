@@ -826,10 +826,10 @@ public class Main {
                 }
                 keyValueString = keyValueString + inputChar.toString();
                 //If bracketcounter is zero and you found a comma (means its followed by the next element
-                if ((bracketCounter != 0 || !inputChar.toString().equalsIgnoreCase(","))
+                if ((bracketCounter == 0 || !inputChar.toString().equalsIgnoreCase(","))
                         //Or if you've seen arraybrackets, but the counter is zero
                         //OR If you have either seen no array brackets
-                        && ((arrayBracketFound && arrayBracketCounter != 0) || !arrayBracketFound)) {
+                        && ((arrayBracketFound && arrayBracketCounter == 0) || !arrayBracketFound)) {
                     //Replace the array bracket if needed
                     if (inputChar.toString().equalsIgnoreCase("[")){
                         keyValueString = keyValueString.substring(0,keyValueString.length()-1);
@@ -1016,6 +1016,7 @@ public class Main {
         String stop = "";
         String processedInput = "";
         do {
+            //Creates a String array of key/value pairs at that level
             processedInput = detectJsonKeyValuePairs(input);
             String[] processedInputSplit = processedInput.split("~~split~~");
             keyValueArray.add(processedInputSplit[0]);
