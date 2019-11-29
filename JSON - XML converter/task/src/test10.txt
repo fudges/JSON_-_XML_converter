@@ -1,34 +1,26 @@
 {
-    "transactions": {
-        "id": "6753322",
-        "data": [
-            123,
-            true,
-            false,
-            [ ],
-            [],
-            { },
-            {},
-            [
-                1, 2, 3,
-                {
-                    "@attr": "value6",
-                    "#element": "value7"
-                }
-            ],
-            null,
-            "",
+    "data": [
+        [
+            1,
+            2,
+            3,
             {
-                "key1": "value1",
-                "key2": {
-                    "@attr": "value2",
-                    "#key2": "value3"
-                }
-            },
-            {
-                "@attr2": "value4",
-                "#element": "value5"
+                "@attr": "value6",
+                "#element": "value7"
             }
-        ]
-    }
+        ],
+        null,
+        "",
+        {
+            "key1": "value1",
+            "key2": {
+                "@attr": "value2",
+                "#key2": "value3"
+            }
+        },
+        {
+            "@attr2": "value4",
+            "#element": "value5"
+        }
+    ]
 }

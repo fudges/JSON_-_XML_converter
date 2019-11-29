@@ -61,6 +61,7 @@ public class Main {
             }
             String tempOutput = convertJSONToIntermediaryFormat(parseJson(input), 0, startingPath);
 //            String tempOutput2 = printKeyValuePairAsXML(parseJson(input),0);
+//            KeyValuePair tempKV = parseJson(input);
             System.out.println(tempOutput);
             output = printAsXML(tempOutput);
             System.out.println(output);
@@ -178,34 +179,6 @@ public class Main {
         return returnString;
     }
 
-    public static KeyValuePair parseJsonArrayBrackets(String input){
-        KeyValuePair returnKeyValuePair = new KeyValuePair();
-
-        //Remove brackets
-
-        //Grab first chunk up until comma when bracketcounter == 0
-        int arrayBracketCounter = 0;
-        int curlyBracketCounter = 0;
-        Character[] inputCharArray = (Character[])input.chars().mapToObj(c -> Character.valueOf((char)c)).toArray(x$0 -> new Character[x$0]);
-        for (Character inputChar : inputCharArray) {
-            if (inputChar.toString().equalsIgnoreCase("[")){
-                ++arrayBracketCounter;
-            } else if (inputChar.toString().equalsIgnoreCase("]")){
-                --arrayBracketCounter;
-            }
-            if (inputChar.toString().equalsIgnoreCase("{")){
-                ++curlyBracketCounter;
-            } else if (inputChar.toString().equalsIgnoreCase("}")){
-                --curlyBracketCounter;
-            }
-
-
-        }
-
-
-        return returnKeyValuePair;
-
-    }
 
     public static KeyValuePair parseJsonKeyValuePair(String input, boolean invalid) {
         Matcher invalidKeyMatcher;
@@ -233,11 +206,16 @@ public class Main {
             return keyValuePair;
         }
 
-        Pattern keyPattern = Pattern.compile("\"([^\"]*)\"");
+        boolean noNameElement = false;
+        Pattern keyPattern = Pattern.compile("^\\s*\"([^\"]*)\"\\s*:\\s*\\{?");
         Matcher keyMatcher = keyPattern.matcher(input);
         String key = "";
         if (keyMatcher.find()) {
             key = keyMatcher.group(1);
+        } else {
+            key = "element";
+            //Set noNameElement to true, so you can parse it in case it has element attributes/values
+            noNameElement = true;
         }
         if ((invalidKeyMatcher = (invalidKeyPattern = Pattern.compile("^@$|^#$")).matcher(key)).find() || key.length() == 0) {
             keyValuePair.setKey("&&&INVALID&&&");
@@ -249,11 +227,11 @@ public class Main {
         keyValuePair.setKey(key);
 
         //Detect and parse arrayBrackets
-        Pattern arrayBracketPattern = Pattern.compile("(\\{.*})");
-        Matcher arrayBracketMatcher = arrayBracketPattern.matcher(input);
-        if (arrayBracketMatcher.find()) {
-            KeyValuePair temp = new KeyValuePair();
-        }
+//        Pattern arrayBracketPattern = Pattern.compile("(\\{.*})");
+//        Matcher arrayBracketMatcher = arrayBracketPattern.matcher(input);
+//        if (arrayBracketMatcher.find()) {
+//            KeyValuePair temp = new KeyValuePair();
+//        }
 
 
         String value = "";
@@ -916,8 +894,8 @@ public class Main {
                             if (pathListFull.size() > 0) {
                                 prevElementPath = pathListFull.get(pathListFull.size()-1).getPathToElement();
                             }
-
-                            if(!line.equalsIgnoreCase(prevElementPath)){
+                            String pathCompare = prevElementPath + ", " + curElementName;
+                            if(line.equalsIgnoreCase(pathCompare)){
                                 isChildElement = true;
                             }
 
@@ -1081,6 +1059,11 @@ public class Main {
                 pathList.remove(i);
             }
 
+            //TODO:
+            //The unroot and unindent part needs some fixing
+            //The interation thing is not removing tabs correctly.
+            //It's going 4,3,2,1
+            //Try doing it 1,2,3,4
 
             //Check for rootOrNot and delete root and remove extra indents if needed
             if (rootTestCounter == 1){
