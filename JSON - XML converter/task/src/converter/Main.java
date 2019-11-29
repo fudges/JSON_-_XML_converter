@@ -14,21 +14,10 @@ import java.util.regex.Pattern;
  */
 public class Main {
     public static void main(String[] args) {
-
-        //I really think I should rewrite this entire thing.
-        //The keyvaluepair with nested nodes seems really confusing to me.
-        // cant remember why i ever did it...
-
-        //TODO:
-        //Work on fixing test 6
-        //It's doing some funky stuff
-
-
-
 //        File file = new File("C:\\Users\\Michael\\Desktop\\JavaProjects\\JSON - XML converter\\JSON - XML converter\\task\\src" +
 //                "\\test10.txt");
         File file = new File("C:\\Users\\mcarner\\Documents\\GitHub\\JSON_-_XML_converter\\JSON - XML converter\\task\\src" +
-                "\\test10.txt");
+                "\\test11.txt");
 
 //        File file = new File("test.txt");
         String input = "";
@@ -45,7 +34,11 @@ public class Main {
         //Clean up extra spaces
         input = (input).replaceAll("\\s+", " ");
 
+//        String tempString = detectJsonElements(input);
+        //Testing array brackets
+//        KeyValuePair temp = parseJsonKeyValuePair(input,false);
         //Check if Json or Xml
+        boolean pause = true;
         String format = isJsonOrXml(input);
         String intermediaryFormat;
         String output = "";
@@ -66,13 +59,30 @@ public class Main {
             if (rootDetectingMatcher.find()){
                 startingPath = "root";
             }
-            output = printAsXML(convertJSONToIntermediaryFormat(parseJson(input), 0, startingPath));
+            String tempOutput = convertJSONToIntermediaryFormat(parseJson(input), 0, startingPath);
+//            String tempOutput2 = printKeyValuePairAsXML(parseJson(input),0);
+            System.out.println(tempOutput);
+            output = printAsXML(tempOutput);
             System.out.println(output);
 
         } else {
             //Could not detect, handle error. EXCEPTION??
             System.out.println("Could not detect format, exiting");
         }
+    }
+
+    public static String printKeyValuePairAsXML(KeyValuePair inputKeyValuePair, int depth){
+        String output = "";
+
+        //Determine if sole tag
+
+
+//        for (KeyValuePair keyValuePair :
+//                inputKeyValuePair.getValueArray()) {
+//
+//        }
+        
+        return output;
     }
 
 
@@ -91,15 +101,7 @@ public class Main {
     }
 
     public static KeyValuePair parseJson(String input) {
-        //Test for root brackets
-        //HEY!! Does this go here or somewhere else?
-        //Test for root brackets
-        /*
-        TODO:
-        -turn this part back on
-        -figure out why it ain't working
-        -It isn't properly adding in the root
-        */
+
         Pattern rootPattern = Pattern.compile("^\\{.*}$");
         Matcher rootMatcher = rootPattern.matcher(input);
         if (rootMatcher.find()){
@@ -117,8 +119,9 @@ public class Main {
 
     }
 
-    public static String detectJsonKeyValuePairs(String input) {
+    public static String detectJsonElements(String input) {
         //This finds the very first keyValuePair and sends the rest back as leftovers
+
 
 
         String keyValueString = "";
@@ -166,11 +169,42 @@ public class Main {
             }
 
         }
-        if (!colonFound || (leftovers).length() == 0) {
+        //colonFound was interfering with parsing arrayBrackets. Is it even necessary?
+//        if (!colonFound || (leftovers).length() == 0) {
+        if (leftovers.length() == 0) {
             leftovers = ">>>END<<<";
         }
         returnString = keyValueString + "~~split~~" + leftovers;
         return returnString;
+    }
+
+    public static KeyValuePair parseJsonArrayBrackets(String input){
+        KeyValuePair returnKeyValuePair = new KeyValuePair();
+
+        //Remove brackets
+
+        //Grab first chunk up until comma when bracketcounter == 0
+        int arrayBracketCounter = 0;
+        int curlyBracketCounter = 0;
+        Character[] inputCharArray = (Character[])input.chars().mapToObj(c -> Character.valueOf((char)c)).toArray(x$0 -> new Character[x$0]);
+        for (Character inputChar : inputCharArray) {
+            if (inputChar.toString().equalsIgnoreCase("[")){
+                ++arrayBracketCounter;
+            } else if (inputChar.toString().equalsIgnoreCase("]")){
+                --arrayBracketCounter;
+            }
+            if (inputChar.toString().equalsIgnoreCase("{")){
+                ++curlyBracketCounter;
+            } else if (inputChar.toString().equalsIgnoreCase("}")){
+                --curlyBracketCounter;
+            }
+
+
+        }
+
+
+        return returnKeyValuePair;
+
     }
 
     public static KeyValuePair parseJsonKeyValuePair(String input, boolean invalid) {
@@ -180,6 +214,25 @@ public class Main {
         if (invalid) {
             keyValuePair.setInvalid(true);
         }
+        //Detect if KeyValuePair or arrayBracket element
+        Pattern arrayBracketValueTestPattern = Pattern.compile("^([^:]*),$");
+        Matcher arrayBracketValueTestMatcher = arrayBracketValueTestPattern.matcher(input);
+        //Blank brackets are handled further down
+        //But also handling it here to prevent reworking a bunch of code
+        boolean elementIsEmpty = input.matches("(^\\[\\s*]|^\\{\\s*}),");
+        if (arrayBracketValueTestMatcher.find()) {
+            if (elementIsEmpty) {
+                keyValuePair.setKey("element");
+                keyValuePair.setValue("");
+                return keyValuePair;
+            }
+            //Is just a single value
+            //Set KEY to "element" and set VALUE to the found value
+            keyValuePair.setKey("element");
+            keyValuePair.setValue(arrayBracketValueTestMatcher.group(1));
+            return keyValuePair;
+        }
+
         Pattern keyPattern = Pattern.compile("\"([^\"]*)\"");
         Matcher keyMatcher = keyPattern.matcher(input);
         String key = "";
@@ -194,13 +247,25 @@ public class Main {
             key = key.replaceFirst("^#", "");
         }
         keyValuePair.setKey(key);
+
+        //Detect and parse arrayBrackets
+        Pattern arrayBracketPattern = Pattern.compile("(\\{.*})");
+        Matcher arrayBracketMatcher = arrayBracketPattern.matcher(input);
+        if (arrayBracketMatcher.find()) {
+            KeyValuePair temp = new KeyValuePair();
+        }
+
+
         String value = "";
-        Pattern valueBracketPattern = Pattern.compile("(\\{.*})");
+        //Detect section of either curly or array brackets
+        Pattern valueBracketPattern = Pattern.compile("((\\[|\\{).*(]|}))");
         Matcher valueBracketMatcher = valueBracketPattern.matcher(input);
         Pattern valuePattern = Pattern.compile("\"[^\"]*\"\\s*:\\s*([^{,]*)");
         Matcher valueMatcher = valuePattern.matcher(input);
         if (valueBracketMatcher.find()) {
-            ArrayList tempArray = parseJsonBrackets(valueBracketMatcher.group(1)).getValueArray();
+            //Parse the values found inside the bracket
+            //Returns an ArrayList of KeyValuePairs containing the elements inside
+            ArrayList<KeyValuePair> tempArray = parseJsonBrackets(valueBracketMatcher.group(1)).getValueArray();
             for (Object parsedKeyValuePairs : tempArray) {
                 keyValuePair.addToValueArray((KeyValuePair)parsedKeyValuePairs);
             }
@@ -288,18 +353,21 @@ public class Main {
             keyValuePair.setValue("");
             return keyValuePair;
         }
-        input = input.strip().replaceAll("^\\{", "").replaceAll("}$", "");
+
+        //Strip off surrounding brackets
+        input = input.strip().replaceAll("^\\{|^\\[", "").replaceAll("}$|]$", "");
         input = input.replaceAll("\\s+", " ");
+
         ArrayList<String> keyValueArray = new ArrayList<String>();
         String stop = "";
-        String processedInput = "";
+        String firstDetectedKeyValuePairString = "";
         do {
-            processedInput = detectJsonKeyValuePairs(input);
-            String[] processedInputSplit = processedInput.split("~~split~~");
-            keyValueArray.add(processedInputSplit[0]);
-            if (processedInputSplit.length <= 1) continue;
-            input = processedInputSplit[1];
-        } while (!processedInput.contains(">>>END<<<"));
+            firstDetectedKeyValuePairString = detectJsonElements(input);
+            String[] firstDetectedKeyValuePairStringSplit = firstDetectedKeyValuePairString.split("~~split~~");
+            keyValueArray.add(firstDetectedKeyValuePairStringSplit[0]);
+            if (firstDetectedKeyValuePairStringSplit.length <= 1) continue;
+            input = firstDetectedKeyValuePairStringSplit[1];
+        } while (!firstDetectedKeyValuePairString.contains(">>>END<<<"));
         boolean invalidFlag = false;
         Iterator i = keyValueArray.iterator();
         while (i.hasNext()) {
@@ -679,11 +747,6 @@ public class Main {
                 prevPath = curPath;
             }
 
-            //TODO:
-            //Iterate through, grabbing value and attributes
-            //When it hits the following "Element:" process everything you've found
-            //
-
             if (lineValue.find()){
                 valueFound = true;
                 curValue = lineValue.group(1);
@@ -783,6 +846,7 @@ public class Main {
         //Lists
         ArrayList<String> parentTags = new ArrayList<>();
         ArrayList<Path> pathList = new ArrayList<>();
+        ArrayList<Path> pathListFull = new ArrayList<>();
 
 
         for (String line :
@@ -843,9 +907,30 @@ public class Main {
                     //if curpath still contains previous elementKey, this new elementKey is a child
                     Pattern childPattern = Pattern.compile(prevElementName);
                     Matcher childMatcher = childPattern.matcher(curPath);
-                    if (childMatcher.find()){
-                        isChildElement = true;
-                    }
+                    boolean childTest2 = false;
+
+                    //If pathList is size 0, ignore fancy rules
+//                    if(pathList.size() == 0){
+                        if (childMatcher.find()){
+                            String prevElementPath = "";
+                            if (pathListFull.size() > 0) {
+                                prevElementPath = pathListFull.get(pathListFull.size()-1).getPathToElement();
+                            }
+
+                            if(!line.equalsIgnoreCase(prevElementPath)){
+                                isChildElement = true;
+                            }
+
+                        }
+//                    } else {
+                        //Otherwise, do the additional check to see if it's not a childElement
+
+//                        notChild = line.equalsIgnoreCase(prevElementPath);
+//                        if (childMatcher.find() && notChild){
+//                            isChildElement = true;
+//                        }
+//                    }
+
 
                     //if it isChildElement, indentLevel++
                     if (isChildElement){
@@ -927,6 +1012,12 @@ public class Main {
                     rootTestCounter++;
                 }
 
+                //Add element to pathListFull
+                Path tempPath = new Path();
+                tempPath.setPrevElementName(prevElementName);
+                tempPath.setPathToElement(prevFullPath);
+                pathListFull.add(tempPath);
+
             }
             if (lineValue.find()){
                 valueFound = true;
@@ -989,10 +1080,6 @@ public class Main {
                 output += "\n" + getIndents(indentLevel) + "</" + lastParentTag + ">";
                 pathList.remove(i);
             }
-
-            //TODO:
-            //Fix the regex here. You need to grab N tabs and replace it with N-1 tabs
-
 
 
             //Check for rootOrNot and delete root and remove extra indents if needed
