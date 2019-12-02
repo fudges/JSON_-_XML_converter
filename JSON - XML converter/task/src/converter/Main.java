@@ -8,16 +8,17 @@ import java.util.Map;
 import java.util.Scanner;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.IntStream;
 
 /*
  * Exception performing whole class analysis ignored.
  */
 public class Main {
     public static void main(String[] args) {
-//        File file = new File("C:\\Users\\Michael\\Desktop\\JavaProjects\\JSON - XML converter\\JSON - XML converter\\task\\src" +
-//                "\\test10.txt");
-        File file = new File("C:\\Users\\mcarner\\Documents\\GitHub\\JSON_-_XML_converter\\JSON - XML converter\\task\\src" +
+        File file = new File("C:\\Users\\Michael\\Desktop\\JavaProjects\\JSON - XML converter1\\JSON - XML converter\\task\\src" +
                 "\\test11.txt");
+//        File file = new File("C:\\Users\\mcarner\\Documents\\GitHub\\JSON_-_XML_converter\\JSON - XML converter\\task\\src" +
+//                "\\test11.txt");
 
 //        File file = new File("test.txt");
         String input = "";
@@ -46,10 +47,14 @@ public class Main {
         if (format.equalsIgnoreCase("XML")){
             //Convert XML -> JSON
 //            intermediaryFormat = convertJSONToIntermediaryFormat(parseJson(input), 0, "");
+            //Remove any headers that may exist
+            input = input.replaceAll("<\\?[^\\?]*\\?>","");
+
             Node tempNode = processXml(input);
-            output = convertXMLToIntermediaryFormat(tempNode,0,"");
+            output = printNodeAsJson(tempNode,0,false);
+//            output = convertXMLToIntermediaryFormat(tempNode,0,"");
 //            System.out.println(output);
-            output = printAsJSON(output);
+//            output = printAsJSON(output);
             System.out.println(output);
         } else if (format.equalsIgnoreCase("JSON")){
             //Convert JSON -> XML
@@ -59,12 +64,13 @@ public class Main {
             if (rootDetectingMatcher.find()){
                 startingPath = "root";
             }
-            String tempOutput = convertJSONToIntermediaryFormat(parseJson(input), 0, startingPath);
-//            String tempOutput2 = printKeyValuePairAsXML(parseJson(input),0);
 //            KeyValuePair tempKV = parseJson(input);
-            System.out.println(tempOutput);
-            output = printAsXML(tempOutput);
-            System.out.println(output);
+//            String tempOutput = convertJSONToIntermediaryFormat(tempKV, 0, startingPath);
+            String tempOutput2 = printKeyValuePairAsXML(parseJson(input),0);
+//            KeyValuePair tempKV = parseJson(input);
+            System.out.println(tempOutput2);
+//            output = printAsXML(tempOutput);
+//            System.out.println(output);
 
         } else {
             //Could not detect, handle error. EXCEPTION??
@@ -72,19 +78,236 @@ public class Main {
         }
     }
 
+
     public static String printKeyValuePairAsXML(KeyValuePair inputKeyValuePair, int depth){
         String output = "";
 
+
+        String key = inputKeyValuePair.getKey();
+        String value = inputKeyValuePair.getValue();
+        boolean loneTag = false;
+        boolean attributesExist = false;
+
         //Determine if sole tag
+        if (value.equalsIgnoreCase("null") && inputKeyValuePair.getValueArray().size() == 0){
+            loneTag = true;
+        }
+
+        //Check for attributes and values in valueArray
+        ArrayList<KeyValuePair> attribArray = new ArrayList<>();
+        if (inputKeyValuePair.getValueArray().size() > 0){
+
+            for (KeyValuePair arrayKeyValuePair :
+                    inputKeyValuePair.getValueArray()) {
+                String tempKey = arrayKeyValuePair.getKey();
+                String tempValue = arrayKeyValuePair.getValue();
+
+                if (tempKey.contains("@")){
+                    attribArray.add(arrayKeyValuePair);
+                    attributesExist = true;
+                } else if (tempKey.contains("#")){
+                    value = tempValue;
+                }
+
+            }
+        }
+
+        //********************
+        //***Start printing***
+        //********************
+        //Add first part of the opening tag
+
+        output += "\n" + getIndents(depth) + "<" + key;
+
+        //Assemble attributes string
+        String attributeString = "";
+
+        if (attributesExist) {
+            attributeString += " ";
+            int attributesCounter = 0;
+            for (KeyValuePair attributeKeyValuePair :
+                    attribArray) {
+                attributesCounter++;
+                attributeString += attributeKeyValuePair.getKey().replaceAll("@","") + "=" + attributeKeyValuePair.getValue();
+
+                if(attributesCounter < attribArray.size()){
+                    attributeString += " ";
+                }
+            }
+        }
+
+        //Add attributes string
+        output += attributeString;
+
+        //If loneTag, add closing portion and RETURN OUTPUT
+        if (loneTag){
+            output += " />";
+            return output;
+        }
+
+        //If there's a value, close the first tag, add value and then close second tag and RETURN OUTPUT
+        if (!value.equalsIgnoreCase("null") && inputKeyValuePair.getValueArray().size() == 0){
+            //Remove the quotations
+            value = value.replaceAll("\"","");
+            output += ">" + value + "</" + key + ">";
+            return output;
+        }
+
+        //If it has child KeyValuePairs, process those recursively
+        if (inputKeyValuePair.getValueArray().size() > 0) {
+            output += ">";
+
+            for (KeyValuePair valueArrayKeyValuePair :
+                    inputKeyValuePair.getValueArray()) {
+                String tempKey = valueArrayKeyValuePair.getKey();
+                //If key does not indicate it is:
+                //  an attribute
+                //  a parent element value
+                //  an invalid element (these are skipped)
+                if (!tempKey.matches("@.*|#.*|&&&INVALID&&&")){
+                    depth++;
+                    output += printKeyValuePairAsXML(valueArrayKeyValuePair,depth);
+                    depth--;
+
+                }
+            }
+            //THIS NEEDS FIXING
+            //Add closing tag
+            if (!value.equalsIgnoreCase("")){
+                output += value.replaceAll("\"","") + "</" + key + ">";
+            } else {
+                output += "\n" + getIndents(depth) + "</" + key + ">";
+            }
+
+            //output += "\n" + getIndents(depth) + "</" + key + ">";
+        }
+
+        //Final test to remove root tags if needed
+        if (depth == 0 && key.equalsIgnoreCase("root") && inputKeyValuePair.getValueArray().size() <= 1) {
+            output = output.replaceAll("\n?</?root>\n?","");
+            //Remove 1 of each tab
+            String tabReduceRegex = "";
+            String tabReplaceString = "";
+
+            tabReduceRegex = "([^\t\\n]?)(\t)(?=[^\t])";
+            output = output.replaceAll(tabReduceRegex,"");
+        }
 
 
-//        for (KeyValuePair keyValuePair :
-//                inputKeyValuePair.getValueArray()) {
-//
-//        }
-        
         return output;
     }
+
+    public static String printNodeAsJson(Node inputNode, int depth, boolean isArrayElement){
+
+        String output = "";
+        //Opening curly brackets
+        if (depth == 0) {
+            output += "{";
+        }
+
+
+//        if (depth == 0) {
+        depth++;
+        output += "\n" + getIndents(depth);
+//        }
+
+        String key = inputNode.getElementKey();
+        String value = inputNode.getElementValue();
+
+        if(!isArrayElement){
+            //Print key
+            output += key + " : ";
+
+            //If there is a value, there will be no children
+            if(!value.equalsIgnoreCase("")){
+                output += value;
+                return output;
+            }
+        }
+        //If there are children, print them.
+        if(value.equalsIgnoreCase("") && inputNode.getChildren().size() > 0){
+
+            //Test if it's an array
+            String prevKey = "";
+            int[] isPartOfAnArray = new int[inputNode.getChildren().size()];
+            int counter = 0;
+
+            for (Node childNode :
+                    inputNode.getChildren()) {
+
+                if (childNode.getElementKey().equalsIgnoreCase(prevKey)){
+                    isPartOfAnArray[counter-1] = 1;
+                    isPartOfAnArray[counter] = 1;
+                }
+
+
+                prevKey = childNode.getElementKey();
+                counter++;
+
+            }
+
+            boolean pause = true;
+
+            //Test if it's an array and print bracket if needed
+
+            //Test if they are all part of array
+            int sum = IntStream.of(isPartOfAnArray).sum();
+            int childIndexCounter = 0;
+
+            if (isPartOfAnArray.length == sum){
+                //All children are part of array
+//                depth++;
+                output += "[";//\n" + getIndents(depth);
+
+
+                for (Node childNode :
+                        inputNode.getChildren()) {
+                    childIndexCounter++;
+                    output += printNodeAsJson(childNode, depth, true);
+
+                    if(childIndexCounter < inputNode.getChildren().size()){
+                        output += ",";
+                    }
+                }
+
+                //Closing array brackets
+//                depth--;
+                output += "\n" + getIndents(depth) + "]";
+                depth--;
+
+            } else if (sum == 0) {
+                //None are part of array
+
+                output += "{";
+//                output += "{\n" + getIndents(depth);
+
+                for (Node childNode :
+                        inputNode.getChildren()) {
+                    childIndexCounter++;
+                    output += printNodeAsJson(childNode, depth, false);
+
+                    if(childIndexCounter < inputNode.getChildren().size()){
+                        output += ",";
+                    }
+
+                }
+            }
+            pause = true;
+
+        }
+
+
+        //Closing curly brackets
+        output += "\n" + getIndents(depth) + "}";
+        return output;
+    }
+
+
+    //TODO:
+    //Looks like the json printing part is working
+    //Test it and make sure!!
+    //
+
 
 
     //<editor-fold desc="Json to XML portion">
@@ -309,13 +532,6 @@ public class Main {
         }
         return keyValuePair;
     }
-
-    //TODO:
-    //You're doing great. It's correctly parsing stuff
-    //parseJsonBrackets() makes it to id:
-    //time to make sure it parses the arrayBrackets correctly
-    //You'll probably have to add those patterns and matchers in for it
-    //And then maybe a new method to handle all that junk.
 
 
 
@@ -889,19 +1105,19 @@ public class Main {
 
                     //If pathList is size 0, ignore fancy rules
 //                    if(pathList.size() == 0){
-                        if (childMatcher.find()){
-                            String prevElementPath = "";
-                            if (pathListFull.size() > 0) {
-                                prevElementPath = pathListFull.get(pathListFull.size()-1).getPathToElement();
-                            }
-                            String pathCompare = prevElementPath + ", " + curElementName;
-                            if(line.equalsIgnoreCase(pathCompare)){
-                                isChildElement = true;
-                            }
-
+                    if (childMatcher.find()){
+                        String prevElementPath = "";
+                        if (pathListFull.size() > 0) {
+                            prevElementPath = pathListFull.get(pathListFull.size()-1).getPathToElement();
                         }
+                        String pathCompare = prevElementPath + ", " + curElementName;
+                        if(line.equalsIgnoreCase(pathCompare)){
+                            isChildElement = true;
+                        }
+
+                    }
 //                    } else {
-                        //Otherwise, do the additional check to see if it's not a childElement
+                    //Otherwise, do the additional check to see if it's not a childElement
 
 //                        notChild = line.equalsIgnoreCase(prevElementPath);
 //                        if (childMatcher.find() && notChild){
@@ -1059,11 +1275,6 @@ public class Main {
                 pathList.remove(i);
             }
 
-            //TODO:
-            //The unroot and unindent part needs some fixing
-            //The interation thing is not removing tabs correctly.
-            //It's going 4,3,2,1
-            //Try doing it 1,2,3,4
 
             //Check for rootOrNot and delete root and remove extra indents if needed
             if (rootTestCounter == 1){
@@ -1072,14 +1283,11 @@ public class Main {
                 //Remove 1 of each tab
                 String tabReduceRegex = "";
                 String tabReplaceString = "";
-                for (int i = 1; i <= maxIndentLevel; i++) {
-                    tabReduceRegex = "([^\t]?)(" + getIndents(i) + ")([^\t])";
-                    tabReplaceString = "$1" + getIndents(i-1) + "$3";
-                    Pattern tabReducePattern = Pattern.compile(tabReduceRegex);
-                    Matcher tabReduceMatcher = tabReducePattern.matcher(output);
-                    output = tabReduceMatcher.replaceAll(tabReplaceString);
-//                    output = output.replaceAll(tabReduceRegex,tabReplaceString);
-                }
+
+                tabReduceRegex = "([^\t\\n]?)(\t)(?=[^\t])";
+                output = output.replaceAll(tabReduceRegex,"");
+                boolean pause = true;
+
 
             }
         }
@@ -1160,17 +1368,37 @@ public class Main {
             String attributeCheck = fullTag.replaceFirst(element + "\\s*", "").stripTrailing();
             if (attributeCheck.length() > 0) {
                 output = output + "{ ";
-                Pattern pattern = Pattern.compile("(\\w+).*?\"(\\w+)\"");
+//                Pattern pattern = Pattern.compile("(\\w+).*?\"(\\w+)\""); ORIGINAL
+//                Pattern pattern = Pattern.compile("(\\w+).*?(?:\"|')(\\w+)(?:\"|')"); ORIGINAL FIXED
+                //Revert to commented out section if this new regex breaks stuff
+                Pattern pattern = Pattern.compile("(\\w+)\\s?=\\s?(?:\"|')(\\w+)(?:\"|')");
                 Matcher matcher = pattern.matcher(attributeCheck);
                 int lastFindPos = 0;
+                boolean attributesFound = false;
                 while (matcher.find()) {
-                    String attributeKey = matcher.group(1);
+                    attributesFound = true;
+                    Node tempNode = new Node();
+                    String attributeKey = "@" + matcher.group(1);
                     String attributeValue = matcher.group(2);
-                    xmlNode.addAddtribute(attributeKey, attributeValue);
+                    tempNode.setElementKey(attributeKey);
+                    tempNode.setElementValue(attributeValue);
+                    xmlNode.addChild(tempNode);
+//                    xmlNode.addAddtribute(attributeKey, attributeValue);
                     output = output + "\"@" + matcher.group(1) + "\" : \"" + matcher.group(2) + "\"";
                     lastFindPos = matcher.end();
                     if (lastFindPos == attributeCheck.length() && elementValue == "" && !loneTag) continue;
                     output = output + ", ";
+                }
+                //Add value as child element if attributes exist
+                if (attributesFound) {
+                    Node tempNode = new Node();
+                    String valueKey = "#" + element;
+
+                    tempNode.setElementKey(valueKey);
+                    tempNode.setElementValue(elementValue);
+
+                    xmlNode.addChild(tempNode);
+                    xmlNode.setElementValue("");
                 }
                 if (elementValue != "" && !loneTag) {
                     output = output + "\"#" + element + "\" : \"" + elementValue + "\"";
