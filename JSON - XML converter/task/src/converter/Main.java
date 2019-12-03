@@ -15,10 +15,10 @@ import java.util.stream.IntStream;
  */
 public class Main {
     public static void main(String[] args) {
-        File file = new File("C:\\Users\\Michael\\Desktop\\JavaProjects\\JSON - XML converter1\\JSON - XML converter\\task\\src" +
-                "\\test11.txt");
-//        File file = new File("C:\\Users\\mcarner\\Documents\\GitHub\\JSON_-_XML_converter\\JSON - XML converter\\task\\src" +
+//        File file = new File("C:\\Users\\Michael\\Desktop\\JavaProjects\\JSON - XML converter1\\JSON - XML converter\\task\\src" +
 //                "\\test11.txt");
+        File file = new File("C:\\Users\\mcarner\\Documents\\GitHub\\JSON_-_XML_converter\\JSON - XML converter\\task\\src" +
+                "\\test11.txt");
 
 //        File file = new File("test.txt");
         String input = "";
@@ -64,9 +64,9 @@ public class Main {
             if (rootDetectingMatcher.find()){
                 startingPath = "root";
             }
-//            KeyValuePair tempKV = parseJson(input);
+            KeyValuePair tempKV = parseJson(input);
 //            String tempOutput = convertJSONToIntermediaryFormat(tempKV, 0, startingPath);
-            String tempOutput2 = printKeyValuePairAsXML(parseJson(input),0);
+            String tempOutput2 = printKeyValuePairAsXML(tempKV,0);
 //            KeyValuePair tempKV = parseJson(input);
             System.out.println(tempOutput2);
 //            output = printAsXML(tempOutput);
@@ -102,11 +102,33 @@ public class Main {
                 String tempKey = arrayKeyValuePair.getKey();
                 String tempValue = arrayKeyValuePair.getValue();
 
+
                 if (tempKey.contains("@")){
                     attribArray.add(arrayKeyValuePair);
                     attributesExist = true;
-                } else if (tempKey.contains("#")){
+                } else if (tempKey.contains("#") && arrayKeyValuePair.getValueArray().size() == 0){
+                    //It's a value with nothing in the ValueArray
                     value = tempValue;
+                } else if (tempKey.contains("#") && arrayKeyValuePair.getValueArray().size() > 0){
+                    //Catches when a value has content stored in the ValueArray such as:
+                    // "#element": {
+                    //                    "deep": {
+                    //                        "@deepattr": "deepvalue",
+                    //                        "#deep": [
+                    //                            1, 2, 3
+                    //                        ]
+                    //                    }
+                    //                }
+                    for (KeyValuePair valueArrayKeyValuePair :
+                            arrayKeyValuePair.getValueArray()) {
+                        depth++;
+                        value += printKeyValuePairAsXML(valueArrayKeyValuePair,depth);
+                        depth--;
+                        boolean pause = true;
+                    }
+                    value += "\n" + getIndents(depth);
+
+                    //NEED ADDITIONAL TESTS. it's now printing the #value element with its own tags
                 }
 
             }
@@ -128,7 +150,10 @@ public class Main {
             for (KeyValuePair attributeKeyValuePair :
                     attribArray) {
                 attributesCounter++;
-                attributeString += attributeKeyValuePair.getKey().replaceAll("@","") + "=" + attributeKeyValuePair.getValue();
+                String attributeValue = "\"" + attributeKeyValuePair.getValue() + "\"";
+                attributeValue = attributeValue.replaceAll("^\"\"(?!$)|(?!^)\"\"$","\"");
+
+                attributeString += attributeKeyValuePair.getKey().replaceAll("@","") + "=" + attributeValue;
 
                 if(attributesCounter < attribArray.size()){
                     attributeString += " ";
@@ -207,8 +232,8 @@ public class Main {
 
 
 //        if (depth == 0) {
-        depth++;
-        output += "\n" + getIndents(depth);
+            depth++;
+            output += "\n" + getIndents(depth);
 //        }
 
         String key = inputNode.getElementKey();
@@ -216,11 +241,15 @@ public class Main {
 
         if(!isArrayElement){
             //Print key
-            output += key + " : ";
+            output += "\"" + key + "\" : ";
 
             //If there is a value, there will be no children
             if(!value.equalsIgnoreCase("")){
-                output += value;
+                if (value.equalsIgnoreCase("null")){
+                    output += value;
+                } else {
+                    output += "\"" + value + "\"";
+                }
                 return output;
             }
         }
@@ -292,7 +321,7 @@ public class Main {
 
                 }
             }
-            pause = true;
+             pause = true;
 
         }
 
@@ -410,8 +439,16 @@ public class Main {
         if (invalid) {
             keyValuePair.setInvalid(true);
         }
+        //TODO:
+        //array2 needs help
+        //If a blank element has a value #element,
+        //  the contents of that value need to be treated as an array (?)
+
+
+
+
         //Detect if KeyValuePair or arrayBracket element
-        Pattern arrayBracketValueTestPattern = Pattern.compile("^([^:]*),$");
+        Pattern arrayBracketValueTestPattern = Pattern.compile("^([^:,]*),?$");
         Matcher arrayBracketValueTestMatcher = arrayBracketValueTestPattern.matcher(input);
         //Blank brackets are handled further down
         //But also handling it here to prevent reworking a bunch of code
@@ -467,8 +504,22 @@ public class Main {
             //Parse the values found inside the bracket
             //Returns an ArrayList of KeyValuePairs containing the elements inside
             ArrayList<KeyValuePair> tempArray = parseJsonBrackets(valueBracketMatcher.group(1)).getValueArray();
-            for (Object parsedKeyValuePairs : tempArray) {
-                keyValuePair.addToValueArray((KeyValuePair)parsedKeyValuePairs);
+            //Only add as blank "element" if it's array.
+            //If there's just one, set value to ""
+            boolean containsValueElement = false;
+            try {
+                if (tempArray.get(0).getKey().equalsIgnoreCase("#element")){
+                    containsValueElement = true;
+                }
+            } catch (Exception e) {
+//                e.printStackTrace();
+            }
+            if (tempArray.size() > 1 || key.matches("^#.*$") || containsValueElement){
+                for (Object parsedKeyValuePairs : tempArray) {
+                    keyValuePair.addToValueArray((KeyValuePair)parsedKeyValuePairs);
+                }
+            } else {
+                keyValuePair.setValue("");
             }
             boolean pause = true;
             boolean invalidFlag = false;
@@ -588,119 +639,7 @@ public class Main {
         return keyValuePair;
     }
 
-    public static String convertJSONToIntermediaryFormat(KeyValuePair input, int depth, String path) {
-        String output = "";
-        Pattern attribPattern = Pattern.compile("^@.*");
-        Pattern elementValuePattern = Pattern.compile("^#.*");
-//        if (depth != 0) {
-        if (depth > 0) {
-            output += "\n";
-        }
-        output += "Element:\n";
-        output += "path = " + path + "\n";
-        if (input.getValue().equalsIgnoreCase("") && input.getValueArray().size() == 0) {
-            if (input.getValue().equalsIgnoreCase("null")) {
-                output += "value = null"+ "\n";
-            } else {
-                output += "value = \"\""+ "\n";
-            }
-        } else if (!input.getValue().equalsIgnoreCase("") && input.getValueArray().size() == 0) {
-            output += "value = " + input.getValue()+ "\n";
-        }
-        Iterator i = input.getValueArray().iterator();
-        while (i.hasNext()) {
-            KeyValuePair temp = (KeyValuePair) i.next();
-            Matcher elementValueMatcher = elementValuePattern.matcher(temp.getKey());
-            if (!elementValueMatcher.find() || temp.getValueArray().size() != 0) continue;
-            output += "value = " + temp.getValue() + "\n";
-            i.remove();
-            break;
-        }
-//        }
-        boolean attribHeaderPrinted = false;
 
-        //This flag makes sure it doesn't run the depth == 0 portion twice and print double
-        boolean depthZeroRan = false;
-
-        //Prevent printing a section twice
-        boolean hasBeenPrinted = false;
-
-        //Iterate through KeyValuePairs held within the root ValueArray
-        if (input.getValueArray().size() > 0) {
-            for (KeyValuePair keyValuePair : input.getValueArray()) {
-                //Do this if at depth of 0 AKA root
-                if (depth == 0) {
-                    path = path + ", " + keyValuePair.getKey();
-                    String tempPath = path;
-                    output += convertJSONToIntermediaryFormat(keyValuePair, (depth + 1), tempPath);
-                    path = (path).replaceFirst(", " + keyValuePair.getKey(), "");
-
-//                    for (KeyValuePair valueArrayKeyValuePair : input.getValueArray()) {
-//                        path = path + ", " + valueArrayKeyValuePair.getKey();
-//                        String tempPath = path;
-//                        output += convertJSONToIntermediaryFormat(valueArrayKeyValuePair, (depth + 1), tempPath);
-//                        path = (path).replaceFirst(", " + valueArrayKeyValuePair.getKey(), "");
-//                    }
-                    depthZeroRan = true;
-                    hasBeenPrinted = true;
-                    continue;
-                } else {///ADDED THIS ONE HERE
-                    String key;
-                    Matcher attribMatcher = attribPattern.matcher(keyValuePair.getKey());
-                    Matcher elementValueMatcher = elementValuePattern.matcher(keyValuePair.getKey());
-                    boolean invalid = false;
-                    if (attribMatcher.find()) {
-                        key = keyValuePair.getKey().replaceFirst("@", "");
-                        if (key.length() == 0) {
-                            invalid = true;
-                            continue;
-                        }
-                        if (depth != 0 && !attribHeaderPrinted) {
-                            output += "attributes:" + "\n";
-                            attribHeaderPrinted = true;
-                        }
-                        if (keyValuePair.getValue().equalsIgnoreCase("null")) {
-                            output += key + " = \"\"" + "\n";
-                            continue;
-                        }
-                        output += key + " = " + keyValuePair.getValue() + "\n";
-                        continue;
-                    }
-                    if (elementValueMatcher.find()) {
-                        key = keyValuePair.getKey().replaceFirst("#", "");
-                        if (keyValuePair.getValue().equalsIgnoreCase("") && keyValuePair.getValueArray().size() > 0) {
-                            for (KeyValuePair valueArrayKeyValuePair : keyValuePair.getValueArray()) {
-                                path = path + ", " + valueArrayKeyValuePair.getKey();
-                                String tempPath = path;
-                                output += convertJSONToIntermediaryFormat(valueArrayKeyValuePair, (depth + 1), tempPath);
-                                path = (path).replaceFirst(", " + valueArrayKeyValuePair.getKey(), "");
-                            }
-                            continue;
-                        }
-                        output += "value = " + keyValuePair.getValue() + "\n";
-                        continue;
-                    } else {
-                        ///ADDED THIS ONE HERE
-                        //Do I need to change this?
-
-                        path = path + ", " + keyValuePair.getKey();
-                        output += convertJSONToIntermediaryFormat(keyValuePair, (depth + 1), path);
-                        path = (path).replaceFirst(",[^,]*$", "");
-                    }
-                }
-
-            }
-        }
-        if (depth != 0) {
-            boolean temp = true;
-        }
-        //add Element: to end to help printAsXML wrap things up after last elementKey
-        if (depth == 0){
-            output += "Element:stop\n";
-        }
-
-        return output;
-    }
 
 
 
@@ -713,6 +652,111 @@ public class Main {
     }
     //</editor-fold>
 
+
+
+
+    public static Node processXml(String input) {
+        String output = "";
+        Node xmlNode = new Node();
+        Pattern pTag = Pattern.compile("(<([^/]*?)/?>)");
+        Matcher mTag = pTag.matcher(input);
+        String elementValue = "";
+        boolean loneTag = false;
+        if (mTag.find()) {
+            Matcher elementValueMatcher;
+            Pattern elementValuePattern;
+            String fullTag = mTag.group(2);
+            String totalTag = mTag.group(1);
+            String element = fullTag.split(" ")[0];
+            output = output + "{ \"" + element + "\" : ";
+            Pattern pLoneTag = Pattern.compile("<.+?/>");
+            Matcher mLoneTag = pLoneTag.matcher(totalTag);
+            if (mLoneTag.find()) {
+                loneTag = true;
+                elementValue = "null";
+            }
+            if (!loneTag && (elementValueMatcher = (elementValuePattern = Pattern.compile(element + "[^>]*>\\s*(.*?)\\s*<")).matcher(input)).find()) {
+                elementValue = elementValueMatcher.group(1);
+            }
+            xmlNode.setElementKey(element);
+            xmlNode.setElementValue(elementValue);
+            String attributeCheck = fullTag.replaceFirst(element + "\\s*", "").stripTrailing();
+            if (attributeCheck.length() > 0) {
+                output = output + "{ ";
+//                Pattern pattern = Pattern.compile("(\\w+).*?\"(\\w+)\""); ORIGINAL
+//                Pattern pattern = Pattern.compile("(\\w+).*?(?:\"|')(\\w+)(?:\"|')"); ORIGINAL FIXED
+                //Revert to commented out section if this new regex breaks stuff
+                Pattern pattern = Pattern.compile("(\\w+)\\s?=\\s?(?:\"|')(\\w+)(?:\"|')");
+                Matcher matcher = pattern.matcher(attributeCheck);
+                int lastFindPos = 0;
+                boolean attributesFound = false;
+                while (matcher.find()) {
+                    attributesFound = true;
+                    Node tempNode = new Node();
+                    String attributeKey = "@" + matcher.group(1);
+                    String attributeValue = matcher.group(2);
+                    tempNode.setElementKey(attributeKey);
+                    tempNode.setElementValue(attributeValue);
+                    xmlNode.addChild(tempNode);
+//                    xmlNode.addAddtribute(attributeKey, attributeValue);
+                    output = output + "\"@" + matcher.group(1) + "\" : \"" + matcher.group(2) + "\"";
+                    lastFindPos = matcher.end();
+                    if (lastFindPos == attributeCheck.length() && elementValue == "" && !loneTag) continue;
+                    output = output + ", ";
+                }
+                //Add value as child element if attributes exist
+                if (attributesFound) {
+                    Node tempNode = new Node();
+                    String valueKey = "#" + element;
+
+                    tempNode.setElementKey(valueKey);
+                    tempNode.setElementValue(elementValue);
+
+                    xmlNode.addChild(tempNode);
+                    xmlNode.setElementValue("");
+                }
+                if (elementValue != "" && !loneTag) {
+                    output = output + "\"#" + element + "\" : \"" + elementValue + "\"";
+                } else if (loneTag) {
+                    output = output + "\"#" + element + "\" : " + elementValue;
+                }
+                output = output + "} ";
+                output = output + "} ";
+            }
+            if (!loneTag) {
+                String recursiveInput = input;
+                String tempRegex = "</?" + element + ".*?>(?:(?!<).)*";
+                recursiveInput = recursiveInput.replaceAll(tempRegex, "");
+                while (recursiveInput.length() > 0) {
+                    Matcher newLoneTagCheckMatcher;
+                    Pattern newLoneTagCheckPattern;
+                    Pattern firstTagPattern = Pattern.compile("<(.*?)/?>");
+                    Matcher firstTagMatcher = firstTagPattern.matcher(recursiveInput);
+                    String firstTag = "";
+                    if (firstTagMatcher.find()) {
+                        firstTag = firstTagMatcher.group(1).split(" ")[0];
+                    }
+                    loneTag = (newLoneTagCheckMatcher = (newLoneTagCheckPattern = Pattern.compile(" ?^<" + firstTag + "[^>]*/>")).matcher(recursiveInput)).find();
+                    String getNextChildRegex = "";
+                    getNextChildRegex = !loneTag ? getNextChildRegex + "<" + firstTag + ".*?</" + firstTag + ">" : getNextChildRegex + "<" + firstTag + ".*?/>";
+                    Pattern childPattern = Pattern.compile(getNextChildRegex);
+                    Matcher childMatcher = childPattern.matcher(recursiveInput);
+                    if (!childMatcher.find()) continue;
+                    String newInput = childMatcher.group();
+                    xmlNode.addChild(processXml(newInput));
+                    recursiveInput = recursiveInput.replaceAll(newInput + "\\s*", "");
+                }
+            } else {
+                return xmlNode;
+            }
+            return xmlNode;
+        }
+        System.out.println("ERROR: No tag found");
+        System.exit(1);
+        return xmlNode;
+    }
+
+    //<editor-fold desc="Unused">
     public static String printAsJSON(String input){
 
         String output = "";
@@ -1295,6 +1339,120 @@ public class Main {
         return output;
     }
 
+    public static String convertJSONToIntermediaryFormat(KeyValuePair input, int depth, String path) {
+        String output = "";
+        Pattern attribPattern = Pattern.compile("^@.*");
+        Pattern elementValuePattern = Pattern.compile("^#.*");
+//        if (depth != 0) {
+        if (depth > 0) {
+            output += "\n";
+        }
+        output += "Element:\n";
+        output += "path = " + path + "\n";
+        if (input.getValue().equalsIgnoreCase("") && input.getValueArray().size() == 0) {
+            if (input.getValue().equalsIgnoreCase("null")) {
+                output += "value = null"+ "\n";
+            } else {
+                output += "value = \"\""+ "\n";
+            }
+        } else if (!input.getValue().equalsIgnoreCase("") && input.getValueArray().size() == 0) {
+            output += "value = " + input.getValue()+ "\n";
+        }
+        Iterator i = input.getValueArray().iterator();
+        while (i.hasNext()) {
+            KeyValuePair temp = (KeyValuePair) i.next();
+            Matcher elementValueMatcher = elementValuePattern.matcher(temp.getKey());
+            if (!elementValueMatcher.find() || temp.getValueArray().size() != 0) continue;
+            output += "value = " + temp.getValue() + "\n";
+            i.remove();
+            break;
+        }
+//        }
+        boolean attribHeaderPrinted = false;
+
+        //This flag makes sure it doesn't run the depth == 0 portion twice and print double
+        boolean depthZeroRan = false;
+
+        //Prevent printing a section twice
+        boolean hasBeenPrinted = false;
+
+        //Iterate through KeyValuePairs held within the root ValueArray
+        if (input.getValueArray().size() > 0) {
+            for (KeyValuePair keyValuePair : input.getValueArray()) {
+                //Do this if at depth of 0 AKA root
+                if (depth == 0) {
+                    path = path + ", " + keyValuePair.getKey();
+                    String tempPath = path;
+                    output += convertJSONToIntermediaryFormat(keyValuePair, (depth + 1), tempPath);
+                    path = (path).replaceFirst(", " + keyValuePair.getKey(), "");
+
+//                    for (KeyValuePair valueArrayKeyValuePair : input.getValueArray()) {
+//                        path = path + ", " + valueArrayKeyValuePair.getKey();
+//                        String tempPath = path;
+//                        output += convertJSONToIntermediaryFormat(valueArrayKeyValuePair, (depth + 1), tempPath);
+//                        path = (path).replaceFirst(", " + valueArrayKeyValuePair.getKey(), "");
+//                    }
+                    depthZeroRan = true;
+                    hasBeenPrinted = true;
+                    continue;
+                } else {///ADDED THIS ONE HERE
+                    String key;
+                    Matcher attribMatcher = attribPattern.matcher(keyValuePair.getKey());
+                    Matcher elementValueMatcher = elementValuePattern.matcher(keyValuePair.getKey());
+                    boolean invalid = false;
+                    if (attribMatcher.find()) {
+                        key = keyValuePair.getKey().replaceFirst("@", "");
+                        if (key.length() == 0) {
+                            invalid = true;
+                            continue;
+                        }
+                        if (depth != 0 && !attribHeaderPrinted) {
+                            output += "attributes:" + "\n";
+                            attribHeaderPrinted = true;
+                        }
+                        if (keyValuePair.getValue().equalsIgnoreCase("null")) {
+                            output += key + " = \"\"" + "\n";
+                            continue;
+                        }
+                        output += key + " = " + keyValuePair.getValue() + "\n";
+                        continue;
+                    }
+                    if (elementValueMatcher.find()) {
+                        key = keyValuePair.getKey().replaceFirst("#", "");
+                        if (keyValuePair.getValue().equalsIgnoreCase("") && keyValuePair.getValueArray().size() > 0) {
+                            for (KeyValuePair valueArrayKeyValuePair : keyValuePair.getValueArray()) {
+                                path = path + ", " + valueArrayKeyValuePair.getKey();
+                                String tempPath = path;
+                                output += convertJSONToIntermediaryFormat(valueArrayKeyValuePair, (depth + 1), tempPath);
+                                path = (path).replaceFirst(", " + valueArrayKeyValuePair.getKey(), "");
+                            }
+                            continue;
+                        }
+                        output += "value = " + keyValuePair.getValue() + "\n";
+                        continue;
+                    } else {
+                        ///ADDED THIS ONE HERE
+                        //Do I need to change this?
+
+                        path = path + ", " + keyValuePair.getKey();
+                        output += convertJSONToIntermediaryFormat(keyValuePair, (depth + 1), path);
+                        path = (path).replaceFirst(",[^,]*$", "");
+                    }
+                }
+
+            }
+        }
+        if (depth != 0) {
+            boolean temp = true;
+        }
+        //add Element: to end to help printAsXML wrap things up after last elementKey
+        if (depth == 0){
+            output += "Element:stop\n";
+        }
+
+        return output;
+    }
+
     public static String convertXMLToIntermediaryFormat(Node node, int depth, String path) {
         path = (path).equalsIgnoreCase("") ? node.elementKey : path + ", " + node.elementKey;
         String output = "";
@@ -1338,106 +1496,5 @@ public class Main {
         }
         return output;
     }
-
-
-    public static Node processXml(String input) {
-        String output = "";
-        Node xmlNode = new Node();
-        Pattern pTag = Pattern.compile("(<([^/]*?)/?>)");
-        Matcher mTag = pTag.matcher(input);
-        String elementValue = "";
-        boolean loneTag = false;
-        if (mTag.find()) {
-            Matcher elementValueMatcher;
-            Pattern elementValuePattern;
-            String fullTag = mTag.group(2);
-            String totalTag = mTag.group(1);
-            String element = fullTag.split(" ")[0];
-            output = output + "{ \"" + element + "\" : ";
-            Pattern pLoneTag = Pattern.compile("<.+?/>");
-            Matcher mLoneTag = pLoneTag.matcher(totalTag);
-            if (mLoneTag.find()) {
-                loneTag = true;
-                elementValue = "null";
-            }
-            if (!loneTag && (elementValueMatcher = (elementValuePattern = Pattern.compile(element + "[^>]*>\\s*(.*?)\\s*<")).matcher(input)).find()) {
-                elementValue = elementValueMatcher.group(1);
-            }
-            xmlNode.setElementKey(element);
-            xmlNode.setElementValue(elementValue);
-            String attributeCheck = fullTag.replaceFirst(element + "\\s*", "").stripTrailing();
-            if (attributeCheck.length() > 0) {
-                output = output + "{ ";
-//                Pattern pattern = Pattern.compile("(\\w+).*?\"(\\w+)\""); ORIGINAL
-//                Pattern pattern = Pattern.compile("(\\w+).*?(?:\"|')(\\w+)(?:\"|')"); ORIGINAL FIXED
-                //Revert to commented out section if this new regex breaks stuff
-                Pattern pattern = Pattern.compile("(\\w+)\\s?=\\s?(?:\"|')(\\w+)(?:\"|')");
-                Matcher matcher = pattern.matcher(attributeCheck);
-                int lastFindPos = 0;
-                boolean attributesFound = false;
-                while (matcher.find()) {
-                    attributesFound = true;
-                    Node tempNode = new Node();
-                    String attributeKey = "@" + matcher.group(1);
-                    String attributeValue = matcher.group(2);
-                    tempNode.setElementKey(attributeKey);
-                    tempNode.setElementValue(attributeValue);
-                    xmlNode.addChild(tempNode);
-//                    xmlNode.addAddtribute(attributeKey, attributeValue);
-                    output = output + "\"@" + matcher.group(1) + "\" : \"" + matcher.group(2) + "\"";
-                    lastFindPos = matcher.end();
-                    if (lastFindPos == attributeCheck.length() && elementValue == "" && !loneTag) continue;
-                    output = output + ", ";
-                }
-                //Add value as child element if attributes exist
-                if (attributesFound) {
-                    Node tempNode = new Node();
-                    String valueKey = "#" + element;
-
-                    tempNode.setElementKey(valueKey);
-                    tempNode.setElementValue(elementValue);
-
-                    xmlNode.addChild(tempNode);
-                    xmlNode.setElementValue("");
-                }
-                if (elementValue != "" && !loneTag) {
-                    output = output + "\"#" + element + "\" : \"" + elementValue + "\"";
-                } else if (loneTag) {
-                    output = output + "\"#" + element + "\" : " + elementValue;
-                }
-                output = output + "} ";
-                output = output + "} ";
-            }
-            if (!loneTag) {
-                String recursiveInput = input;
-                String tempRegex = "</?" + element + ".*?>(?:(?!<).)*";
-                recursiveInput = recursiveInput.replaceAll(tempRegex, "");
-                while (recursiveInput.length() > 0) {
-                    Matcher newLoneTagCheckMatcher;
-                    Pattern newLoneTagCheckPattern;
-                    Pattern firstTagPattern = Pattern.compile("<(.*?)/?>");
-                    Matcher firstTagMatcher = firstTagPattern.matcher(recursiveInput);
-                    String firstTag = "";
-                    if (firstTagMatcher.find()) {
-                        firstTag = firstTagMatcher.group(1).split(" ")[0];
-                    }
-                    loneTag = (newLoneTagCheckMatcher = (newLoneTagCheckPattern = Pattern.compile(" ?^<" + firstTag + "[^>]*/>")).matcher(recursiveInput)).find();
-                    String getNextChildRegex = "";
-                    getNextChildRegex = !loneTag ? getNextChildRegex + "<" + firstTag + ".*?</" + firstTag + ">" : getNextChildRegex + "<" + firstTag + ".*?/>";
-                    Pattern childPattern = Pattern.compile(getNextChildRegex);
-                    Matcher childMatcher = childPattern.matcher(recursiveInput);
-                    if (!childMatcher.find()) continue;
-                    String newInput = childMatcher.group();
-                    xmlNode.addChild(processXml(newInput));
-                    recursiveInput = recursiveInput.replaceAll(newInput + "\\s*", "");
-                }
-            } else {
-                return xmlNode;
-            }
-            return xmlNode;
-        }
-        System.out.println("ERROR: No tag found");
-        System.exit(1);
-        return xmlNode;
-    }
+    //</editor-fold>
 }
