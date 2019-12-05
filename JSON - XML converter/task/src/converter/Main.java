@@ -2,10 +2,7 @@ package converter;
 
 import java.io.File;
 import java.io.FileNotFoundException;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.Map;
-import java.util.Scanner;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.IntStream;
@@ -78,6 +75,21 @@ public class Main {
         }
     }
 
+    public static boolean fullOfNullsCheck(KeyValuePair nullCheckKVP){
+        boolean fullOfNulls = true;
+        for (KeyValuePair valueArrayKVP :
+                nullCheckKVP.getValueArray()) {
+            if (!valueArrayKVP.getValue().equalsIgnoreCase("null")){
+                fullOfNulls = false;
+            }
+            if (valueArrayKVP.getValueArray().size() > 0){
+                if(!fullOfNullsCheck(nullCheckKVP)){
+                    fullOfNulls = false;
+                }
+            }
+        }
+        return fullOfNulls;
+    }
 
     public static String printKeyValuePairAsXML(KeyValuePair inputKeyValuePair, int depth){
         String output = "";
@@ -88,10 +100,6 @@ public class Main {
         boolean loneTag = false;
         boolean attributesExist = false;
 
-        //Determine if sole tag
-        if (value.equalsIgnoreCase("null") && inputKeyValuePair.getValueArray().size() == 0){
-            loneTag = true;
-        }
 
         //Check for attributes and values in valueArray
         ArrayList<KeyValuePair> attribArray = new ArrayList<>();
@@ -134,6 +142,15 @@ public class Main {
             }
         }
 
+        //Determine if sole tag
+//        if (value.equalsIgnoreCase("null") && inputKeyValuePair.getValueArray().size() <= 1){
+        if (value.equalsIgnoreCase("null")){
+            loneTag = true;
+        }
+        //Additional loneTag check for valueArrays > 1 but contain only nulls
+//        if (fullOfNullsCheck(inputKeyValuePair)){
+//            loneTag = true;
+//        }
         //********************
         //***Start printing***
         //********************
@@ -152,6 +169,7 @@ public class Main {
                 attributesCounter++;
                 String attributeValue = "\"" + attributeKeyValuePair.getValue() + "\"";
                 attributeValue = attributeValue.replaceAll("^\"\"(?!$)|(?!^)\"\"$","\"");
+                attributeValue = attributeValue.replaceAll("^\"?null\"?$","\"\"");
 
                 attributeString += attributeKeyValuePair.getKey().replaceAll("@","") + "=" + attributeValue;
 
@@ -171,7 +189,8 @@ public class Main {
         }
 
         //If there's a value, close the first tag, add value and then close second tag and RETURN OUTPUT
-        if (!value.equalsIgnoreCase("null") && inputKeyValuePair.getValueArray().size() == 0){
+        if (!value.equalsIgnoreCase("null") && inputKeyValuePair.getValueArray().size() == 0
+            && !value.matches("<|>")){
             //Remove the quotations
             value = value.replaceAll("\"","");
             output += ">" + value + "</" + key + ">";
@@ -199,7 +218,10 @@ public class Main {
             //THIS NEEDS FIXING
             //Add closing tag
             if (!value.equalsIgnoreCase("")){
-                output += value.replaceAll("\"","") + "</" + key + ">";
+                if (!value.contains("<")){
+                    value = value.replaceAll("\"","");
+                }
+                output += value + "</" + key + ">";
             } else {
                 output += "\n" + getIndents(depth) + "</" + key + ">";
             }
@@ -439,10 +461,7 @@ public class Main {
         if (invalid) {
             keyValuePair.setInvalid(true);
         }
-        //TODO:
-        //array2 needs help
-        //If a blank element has a value #element,
-        //  the contents of that value need to be treated as an array (?)
+
 
 
 
@@ -510,10 +529,16 @@ public class Main {
             try {
                 if (tempArray.get(0).getKey().equalsIgnoreCase("#element")){
                     containsValueElement = true;
+                } else if (tempArray.size() == 1 && (tempArray.get(0).getValueArray().size() > 0 || !tempArray.get(0).getValue().equalsIgnoreCase(""))){
+                    containsValueElement = true;
                 }
             } catch (Exception e) {
 //                e.printStackTrace();
             }
+            //TODO:
+            //inner2 is discarding it here
+            //WHY?
+            //Can I change the else statement??
             if (tempArray.size() > 1 || key.matches("^#.*$") || containsValueElement){
                 for (Object parsedKeyValuePairs : tempArray) {
                     keyValuePair.addToValueArray((KeyValuePair)parsedKeyValuePairs);
@@ -653,7 +678,63 @@ public class Main {
     //</editor-fold>
 
 
+    public static KeyValuePair xmlGetNextChild(String input){
+        //This method iterates through the String input, remembers the first tag and looks for it's closing tag
+        //It uses counters so it doesn't accidentally grab a closing tag of the same name
 
+        String output = "";
+        String leftovers = "";
+        KeyValuePair outputValues = new KeyValuePair();
+
+        int tagCounter = 0;
+//        int closeTagCounter = 0;
+        String currentTag = "";
+        boolean done = false;
+        for (String chunk :
+                input.split("(?=<)|(?<=>)")) {
+            //Catch lone tags
+            if (chunk.matches("^<[^>/]*/>$") && currentTag.equalsIgnoreCase("")){
+                output += chunk;
+                done = true;
+                continue;
+            }
+
+            //Grab first tag, increment counter, print to output and CONTINUE
+            if (currentTag.equalsIgnoreCase("")){
+                currentTag = chunk.replaceAll("<|\\s[^>]*>|>","");
+
+                tagCounter++;
+                output += chunk;
+                continue;
+            }
+            //Counts opening tags that have same name
+            String openingRegex = "^<" + currentTag + "[^>]*>$";
+            String closingRegex = "^</" + currentTag + "[^>]*>$";
+            if (chunk.matches(openingRegex)){
+                tagCounter++;
+            }
+            //Counts closing tags that have same name
+            if (chunk.matches(closingRegex)){
+                tagCounter--;
+            }
+
+            if (!done){
+                output += chunk;
+            } else {
+                leftovers += chunk;
+            }
+
+            if (tagCounter == 0 && chunk.equalsIgnoreCase("</" + currentTag + ">")){
+                done = true;
+
+            }
+
+        }
+
+        outputValues.setKey(output);
+        outputValues.setValue(leftovers);
+        return outputValues;
+    }
 
     public static Node processXml(String input) {
         String output = "";
@@ -725,8 +806,10 @@ public class Main {
             }
             if (!loneTag) {
                 String recursiveInput = input;
-                String tempRegex = "</?" + element + ".*?>(?:(?!<).)*";
-                recursiveInput = recursiveInput.replaceAll(tempRegex, "");
+                String tempRegex = "^<" + element + "[^>]*>(?:(?!<).)*" + "|" + "</" + element + "[^>]?>(?:(?!<).)*$";
+                recursiveInput = recursiveInput.replaceAll(tempRegex, "").trim();
+                KeyValuePair childElementKVP = new KeyValuePair();
+
                 while (recursiveInput.length() > 0) {
                     Matcher newLoneTagCheckMatcher;
                     Pattern newLoneTagCheckPattern;
@@ -738,13 +821,22 @@ public class Main {
                     }
                     loneTag = (newLoneTagCheckMatcher = (newLoneTagCheckPattern = Pattern.compile(" ?^<" + firstTag + "[^>]*/>")).matcher(recursiveInput)).find();
                     String getNextChildRegex = "";
-                    getNextChildRegex = !loneTag ? getNextChildRegex + "<" + firstTag + ".*?</" + firstTag + ">" : getNextChildRegex + "<" + firstTag + ".*?/>";
-                    Pattern childPattern = Pattern.compile(getNextChildRegex);
-                    Matcher childMatcher = childPattern.matcher(recursiveInput);
-                    if (!childMatcher.find()) continue;
-                    String newInput = childMatcher.group();
-                    xmlNode.addChild(processXml(newInput));
-                    recursiveInput = recursiveInput.replaceAll(newInput + "\\s*", "");
+                    //Get the next child here
+                    childElementKVP = xmlGetNextChild(recursiveInput);
+                    String child = childElementKVP.getKey().trim();
+                    String leftovers = childElementKVP.getValue().trim();
+
+//                    getNextChildRegex = !loneTag ? getNextChildRegex + "<" + firstTag + ".*?</" + firstTag + ">" : getNextChildRegex + "<" + firstTag + ".*?/>";
+//                    Pattern childPattern = Pattern.compile(getNextChildRegex);
+//                    Matcher childMatcher = childPattern.matcher(recursiveInput);
+//                    if (!childMatcher.find()) continue;
+                    xmlNode.addChild(processXml(child));
+                    recursiveInput = leftovers;
+                    if (recursiveInput.matches("\\s*")){
+                        recursiveInput = "";
+                    }
+
+//                    recursiveInput = recursiveInput.replaceAll(child + "\\s*", "");
                 }
             } else {
                 return xmlNode;
